@@ -1,0 +1,13 @@
+version: sql-cache-v1
+kind: SQL
+name: mock-1772270537669442000
+spec:
+    metadata:
+        recorded_at: "2026-02-28T14:52:17+05:30"
+    request:
+        query: SELECT * FROM nonexistent
+        type: SELECT
+        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.StarExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS'
+    response:
+        error: 'table not found: nonexistent'
+    created: 1772270537

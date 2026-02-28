@@ -1,0 +1,25 @@
+version: sql-cache-v1
+kind: SQL
+name: mock-1772270429101386000
+spec:
+    metadata:
+        recorded_at: "2026-02-28T14:50:29+05:30"
+    request:
+        query: SELECT * FROM products WHERE category = ?
+        args:
+            - electronics
+        type: SELECT
+        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.StarExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Where->*sqlparser.ComparisonExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Argument'
+    response:
+        columns:
+            - id
+            - name
+            - price
+        rows:
+            - - 1
+              - Widget
+              - 9.99
+            - - 2
+              - Gadget
+              - 19.99
+    created: 1772270429

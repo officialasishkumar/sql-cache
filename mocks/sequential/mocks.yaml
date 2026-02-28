@@ -1,0 +1,325 @@
+# SQL Cache Sequential Mocks
+# This file demonstrates the mock format that is optimized for production.
+# Key features:
+# - AST structure-based matching (uses vitess sqlparser)
+# - Placeholder count verification for prepared statements
+# - DML type checking (SELECT vs INSERT/UPDATE/DELETE)
+# - Sequential replay support with consumption tracking
+# - Type-flexible argument matching
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-select-user-by-id
+spec:
+    metadata:
+        recorded_at: "2026-02-28T15:00:00+05:30"
+        operation: "query"
+        description: "Fetch user by ID"
+    request:
+        query: SELECT id, name, email FROM users WHERE id = ?
+        args:
+            - 1
+        type: SELECT
+        tables:
+            - users
+        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.Where->*sqlparser.ComparisonExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Argument'
+        placeholder_count: 1
+        is_dml: true
+        query_hash: "a1b2c3d4e5f6"
+    response:
+        columns:
+            - id
+            - name
+            - email
+        rows:
+            - - 1
+              - Alice
+              - alice@example.com
+        row_count: 1
+    created: 1772272800
+    req_timestamp: 1772272800000000000
+    res_timestamp: 1772272800100000000
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-select-user-by-id-2
+spec:
+    metadata:
+        recorded_at: "2026-02-28T15:00:01+05:30"
+        operation: "query"
+        description: "Fetch user by ID - second user"
+    request:
+        query: SELECT id, name, email FROM users WHERE id = ?
+        args:
+            - 2
+        type: SELECT
+        tables:
+            - users
+        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.Where->*sqlparser.ComparisonExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Argument'
+        placeholder_count: 1
+        is_dml: true
+        query_hash: "a1b2c3d4e5f6"
+    response:
+        columns:
+            - id
+            - name
+            - email
+        rows:
+            - - 2
+              - Bob
+              - bob@example.com
+        row_count: 1
+    created: 1772272801
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-select-all-users
+spec:
+    metadata:
+        recorded_at: "2026-02-28T15:00:02+05:30"
+        operation: "query"
+        description: "Fetch all users"
+    request:
+        query: SELECT id, name, email FROM users
+        args: []
+        type: SELECT
+        tables:
+            - users
+        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI'
+        placeholder_count: 0
+        is_dml: true
+    response:
+        columns:
+            - id
+            - name
+            - email
+        rows:
+            - - 1
+              - Alice
+              - alice@example.com
+            - - 2
+              - Bob
+              - bob@example.com
+            - - 3
+              - Charlie
+              - charlie@example.com
+        row_count: 3
+    created: 1772272802
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-insert-user
+spec:
+    metadata:
+        recorded_at: "2026-02-28T15:00:03+05:30"
+        operation: "exec"
+        description: "Insert new user"
+    request:
+        query: INSERT INTO users (name, email) VALUES (?, ?)
+        args:
+            - Dave
+            - dave@example.com
+        type: INSERT
+        tables:
+            - users
+        structure: '*sqlparser.Insert->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.Columns->sqlparser.IdentifierCI->sqlparser.IdentifierCI->*sqlparser.ValTuple->*sqlparser.Argument->*sqlparser.Argument'
+        placeholder_count: 2
+        is_dml: true
+    response:
+        last_insert_id: 4
+        rows_affected: 1
+    created: 1772272803
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-update-user-email
+spec:
+    metadata:
+        recorded_at: "2026-02-28T15:00:04+05:30"
+        operation: "exec"
+        description: "Update user email"
+    request:
+        query: UPDATE users SET email = ? WHERE id = ?
+        args:
+            - alice.updated@example.com
+            - 1
+        type: UPDATE
+        tables:
+            - users
+        structure: '*sqlparser.Update->*sqlparser.UpdateExprs->*sqlparser.UpdateExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Argument->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Where->*sqlparser.ComparisonExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Argument'
+        placeholder_count: 2
+        is_dml: true
+    response:
+        rows_affected: 1
+    created: 1772272804
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-delete-user
+spec:
+    metadata:
+        recorded_at: "2026-02-28T15:00:05+05:30"
+        operation: "exec"
+        description: "Delete user by ID"
+    request:
+        query: DELETE FROM users WHERE id = ?
+        args:
+            - 4
+        type: DELETE
+        tables:
+            - users
+        structure: '*sqlparser.Delete->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Where->*sqlparser.ComparisonExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Argument'
+        placeholder_count: 1
+        is_dml: true
+    response:
+        rows_affected: 1
+    created: 1772272805
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-count-users
+spec:
+    metadata:
+        recorded_at: "2026-02-28T15:00:06+05:30"
+        operation: "query"
+        description: "Count active users"
+    request:
+        query: SELECT COUNT(*) FROM users WHERE active = ?
+        args:
+            - true
+        type: SELECT
+        tables:
+            - users
+        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.CountStar->sqlparser.IdentifierCI->*sqlparser.Where->*sqlparser.ComparisonExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Argument'
+        placeholder_count: 1
+        is_dml: true
+    response:
+        columns:
+            - COUNT(*)
+        rows:
+            - - 3
+        row_count: 1
+    created: 1772272806
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-error-response
+spec:
+    metadata:
+        recorded_at: "2026-02-28T15:00:07+05:30"
+        operation: "query"
+        description: "Error response for testing error handling"
+    request:
+        query: SELECT * FROM nonexistent_table
+        args: []
+        type: SELECT
+        tables:
+            - nonexistent_table
+        placeholder_count: 0
+        is_dml: true
+    response:
+        error: "table 'nonexistent_table' does not exist"
+    created: 1772272807
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-complex-join
+spec:
+    metadata:
+        recorded_at: "2026-02-28T15:00:08+05:30"
+        operation: "query"
+        description: "Complex query with JOIN"
+    request:
+        query: |
+            SELECT u.id, u.name, o.total, o.status 
+            FROM users u 
+            INNER JOIN orders o ON u.id = o.user_id 
+            WHERE u.id = ?
+        args:
+            - 1
+        type: SELECT
+        tables:
+            - users
+            - orders
+        placeholder_count: 1
+        is_dml: true
+    response:
+        columns:
+            - id
+            - name
+            - total
+            - status
+        rows:
+            - - 1
+              - Alice
+              - 100.50
+              - completed
+            - - 1
+              - Alice
+              - 75.00
+              - pending
+        row_count: 2
+    created: 1772272808
+
+---
+# Sequential replay example - same query, different results
+# In sequential mode, these will be returned in order
+version: sql-cache-v1
+kind: SQL
+name: mock-sequential-counter-1
+spec:
+    metadata:
+        recorded_at: "2026-02-28T15:00:09+05:30"
+        operation: "query"
+        description: "Sequential counter - first call"
+    request:
+        query: SELECT value FROM config WHERE key = ?
+        args:
+            - counter
+        type: SELECT
+        tables:
+            - config
+        placeholder_count: 1
+        is_dml: true
+    response:
+        columns:
+            - value
+        rows:
+            - - 1
+        row_count: 1
+    created: 1772272809
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-sequential-counter-2
+spec:
+    metadata:
+        recorded_at: "2026-02-28T15:00:10+05:30"
+        operation: "query"
+        description: "Sequential counter - second call"
+    request:
+        query: SELECT value FROM config WHERE key = ?
+        args:
+            - counter
+        type: SELECT
+        tables:
+            - config
+        placeholder_count: 1
+        is_dml: true
+    response:
+        columns:
+            - value
+        rows:
+            - - 2
+        row_count: 1
+    created: 1772272810

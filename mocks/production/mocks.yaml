@@ -1,0 +1,675 @@
+# Production-Ready SQL Mocks (SQL Cache Format)
+# =====================================================
+# This file demonstrates the comprehensive mock format used by sql-cache.
+# The format is designed to be optimized for production while
+# being optimized for higher-level SQL interception.
+#
+# Key Matching Features:
+# 1. Exact query string matching (highest priority)
+# 2. AST structure-based matching using vitess sqlparser
+# 3. Placeholder count verification for prepared statements
+# 4. DML type checking (SELECT vs INSERT/UPDATE/DELETE)
+# 5. Sequential replay support with consumption tracking
+# 6. Type-flexible argument matching (int/int64/float64 interop)
+#
+# Usage:
+#   cache.SetMode(sqlcache.ModeReplay)
+#   rows, _ := cache.Query("SELECT * FROM users WHERE id = ?", 1)
+#
+# The matching algorithm will:
+# 1. First try exact query + args match
+# 2. Fall back to structural match (same AST structure)
+# 3. Check placeholder count matches
+# 4. Verify DML type compatibility
+# 5. Score partial matches for best-effort
+
+---
+# Basic SELECT query - single row by ID
+version: sql-cache/v1
+kind: SQL
+name: mock-select-user-by-id
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:00+05:30"
+        operation: "query"
+        description: "Fetch user by ID - demonstrates basic SELECT with single placeholder"
+    Request:
+        Query: SELECT id, name, email, created_at FROM users WHERE id = ?
+        Args:
+            - 1
+        Type: SELECT
+        Tables:
+            - users
+        Structure: "*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->*sqlparser.AliasedExpr->*sqlparser.ColName->*sqlparser.AliasedExpr->*sqlparser.ColName->*sqlparser.AliasedExpr->*sqlparser.ColName->*sqlparser.Where->*sqlparser.ComparisonExpr->*sqlparser.ColName->*sqlparser.Argument"
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: "a1b2c3d4e5f67890"
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+            - created_at
+        Rows:
+            - - 1
+              - "Alice"
+              - "alice@example.com"
+              - "2026-01-15T10:30:00Z"
+        RowCount: 1
+    Created: 1772272800
+    ReqTimestampMock: 2026-02-28T15:00:00+05:30
+    ResTimestampMock: 2026-02-28T15:00:00.1+05:30
+
+---
+# SELECT query with multiple placeholders
+version: sql-cache/v1
+kind: SQL
+name: mock-select-user-by-name-and-status
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:01+05:30"
+        operation: "query"
+        description: "Fetch users by name pattern and status - demonstrates LIKE and multiple conditions"
+    Request:
+        Query: SELECT id, name, email FROM users WHERE name LIKE ? AND status = ?
+        Args:
+            - "%alice%"
+            - "active"
+        Type: SELECT
+        Tables:
+            - users
+        PlaceholderCount: 2
+        IsDML: true
+        QueryHash: "b2c3d4e5f6789012"
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+        Rows:
+            - - 1
+              - "Alice"
+              - "alice@example.com"
+            - - 5
+              - "Alice Smith"
+              - "alice.smith@example.com"
+        RowCount: 2
+    Created: 1772272801
+
+---
+# SELECT all without placeholders
+version: sql-cache/v1
+kind: SQL
+name: mock-select-all-users
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:02+05:30"
+        operation: "query"
+        description: "Fetch all users - demonstrates query without placeholders"
+    Request:
+        Query: SELECT id, name, email FROM users
+        Args: []
+        Type: SELECT
+        Tables:
+            - users
+        PlaceholderCount: 0
+        IsDML: true
+        QueryHash: "c3d4e5f678901234"
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+        Rows:
+            - - 1
+              - "Alice"
+              - "alice@example.com"
+            - - 2
+              - "Bob"
+              - "bob@example.com"
+            - - 3
+              - "Charlie"
+              - "charlie@example.com"
+        RowCount: 3
+    Created: 1772272802
+
+---
+# SELECT with JOIN
+version: sql-cache/v1
+kind: SQL
+name: mock-select-users-with-orders
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:03+05:30"
+        operation: "query"
+        description: "Fetch users with their orders - demonstrates JOIN query"
+    Request:
+        Query: SELECT u.id, u.name, o.order_id, o.total FROM users u INNER JOIN orders o ON u.id = o.user_id WHERE u.id = ?
+        Args:
+            - 1
+        Type: SELECT
+        Tables:
+            - users
+            - orders
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: "d4e5f6789012345a"
+    Response:
+        Columns:
+            - id
+            - name
+            - order_id
+            - total
+        Rows:
+            - - 1
+              - "Alice"
+              - 1001
+              - 150.50
+            - - 1
+              - "Alice"
+              - 1002
+              - 75.25
+        RowCount: 2
+    Created: 1772272803
+
+---
+# SELECT with aggregation
+version: sql-cache/v1
+kind: SQL
+name: mock-count-active-users
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:04+05:30"
+        operation: "query"
+        description: "Count active users - demonstrates COUNT(*) aggregate"
+    Request:
+        Query: SELECT COUNT(*) as total FROM users WHERE status = ?
+        Args:
+            - "active"
+        Type: SELECT
+        Tables:
+            - users
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: "e5f6789012345abc"
+    Response:
+        Columns:
+            - total
+        Rows:
+            - - 42
+        RowCount: 1
+    Created: 1772272804
+
+---
+# SELECT with GROUP BY and HAVING
+version: sql-cache/v1
+kind: SQL
+name: mock-user-order-summary
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:05+05:30"
+        operation: "query"
+        description: "User order summary - demonstrates GROUP BY with HAVING clause"
+    Request:
+        Query: SELECT user_id, COUNT(*) as order_count, SUM(total) as total_spent FROM orders GROUP BY user_id HAVING COUNT(*) > ?
+        Args:
+            - 5
+        Type: SELECT
+        Tables:
+            - orders
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: "f6789012345abcde"
+    Response:
+        Columns:
+            - user_id
+            - order_count
+            - total_spent
+        Rows:
+            - - 1
+              - 10
+              - 1250.75
+            - - 2
+              - 8
+              - 890.50
+        RowCount: 2
+    Created: 1772272805
+
+---
+# INSERT - single row
+version: sql-cache/v1
+kind: SQL
+name: mock-insert-user
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:06+05:30"
+        operation: "exec"
+        description: "Insert new user - demonstrates basic INSERT"
+    Request:
+        Query: INSERT INTO users (name, email, status) VALUES (?, ?, ?)
+        Args:
+            - "Dave"
+            - "dave@example.com"
+            - "active"
+        Type: INSERT
+        Tables:
+            - users
+        PlaceholderCount: 3
+        IsDML: true
+        QueryHash: "0789012345abcdef"
+    Response:
+        LastInsertID: 4
+        RowsAffected: 1
+    Created: 1772272806
+
+---
+# INSERT with ON DUPLICATE KEY UPDATE
+version: sql-cache/v1
+kind: SQL
+name: mock-upsert-user
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:07+05:30"
+        operation: "exec"
+        description: "Upsert user - demonstrates INSERT ON DUPLICATE KEY UPDATE"
+    Request:
+        Query: INSERT INTO users (id, name, email) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name), email = VALUES(email)
+        Args:
+            - 1
+            - "Alice Updated"
+            - "alice.updated@example.com"
+        Type: INSERT
+        Tables:
+            - users
+        PlaceholderCount: 3
+        IsDML: true
+        QueryHash: "89012345abcdef01"
+    Response:
+        LastInsertID: 1
+        RowsAffected: 2  # MySQL returns 2 for UPDATE via ON DUPLICATE
+    Created: 1772272807
+
+---
+# UPDATE - single row
+version: sql-cache/v1
+kind: SQL
+name: mock-update-user-email
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:08+05:30"
+        operation: "exec"
+        description: "Update user email - demonstrates basic UPDATE"
+    Request:
+        Query: UPDATE users SET email = ?, updated_at = NOW() WHERE id = ?
+        Args:
+            - "alice.new@example.com"
+            - 1
+        Type: UPDATE
+        Tables:
+            - users
+        PlaceholderCount: 2
+        IsDML: true
+        QueryHash: "9012345abcdef012"
+    Response:
+        RowsAffected: 1
+    Created: 1772272808
+
+---
+# UPDATE - multiple rows
+version: sql-cache/v1
+kind: SQL
+name: mock-update-user-status-batch
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:09+05:30"
+        operation: "exec"
+        description: "Batch update user status - demonstrates UPDATE affecting multiple rows"
+    Request:
+        Query: UPDATE users SET status = ? WHERE status = ? AND last_login < ?
+        Args:
+            - "inactive"
+            - "active"
+            - "2025-12-01"
+        Type: UPDATE
+        Tables:
+            - users
+        PlaceholderCount: 3
+        IsDML: true
+        QueryHash: "012345abcdef0123"
+    Response:
+        RowsAffected: 15
+    Created: 1772272809
+
+---
+# DELETE - single row
+version: sql-cache/v1
+kind: SQL
+name: mock-delete-user
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:10+05:30"
+        operation: "exec"
+        description: "Delete user by ID - demonstrates basic DELETE"
+    Request:
+        Query: DELETE FROM users WHERE id = ?
+        Args:
+            - 4
+        Type: DELETE
+        Tables:
+            - users
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: "12345abcdef01234"
+    Response:
+        RowsAffected: 1
+    Created: 1772272810
+
+---
+# DELETE - multiple rows with IN clause
+version: sql-cache/v1
+kind: SQL
+name: mock-delete-users-batch
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:11+05:30"
+        operation: "exec"
+        description: "Delete multiple users - demonstrates DELETE with IN clause"
+    Request:
+        Query: DELETE FROM users WHERE id IN (?, ?, ?)
+        Args:
+            - 10
+            - 11
+            - 12
+        Type: DELETE
+        Tables:
+            - users
+        PlaceholderCount: 3
+        IsDML: true
+        QueryHash: "2345abcdef012345"
+    Response:
+        RowsAffected: 3
+    Created: 1772272811
+
+---
+# SELECT with subquery
+version: sql-cache/v1
+kind: SQL
+name: mock-select-users-with-orders-subquery
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:12+05:30"
+        operation: "query"
+        description: "Users with orders - demonstrates subquery"
+    Request:
+        Query: SELECT * FROM users WHERE id IN (SELECT DISTINCT user_id FROM orders WHERE total > ?)
+        Args:
+            - 100.00
+        Type: SELECT
+        Tables:
+            - users
+            - orders
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: "345abcdef0123456"
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+            - status
+            - created_at
+        Rows:
+            - - 1
+              - "Alice"
+              - "alice@example.com"
+              - "active"
+              - "2026-01-15T10:30:00Z"
+            - - 2
+              - "Bob"
+              - "bob@example.com"
+              - "active"
+              - "2026-01-16T11:00:00Z"
+        RowCount: 2
+    Created: 1772272812
+
+---
+# Query returning empty result
+version: sql-cache/v1
+kind: SQL
+name: mock-select-user-not-found
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:13+05:30"
+        operation: "query"
+        description: "User not found - demonstrates empty result set"
+    Request:
+        Query: SELECT * FROM users WHERE id = ?
+        Args:
+            - 99999
+        Type: SELECT
+        Tables:
+            - users
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: "45abcdef01234567"
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+            - status
+            - created_at
+        Rows: []
+        RowCount: 0
+    Created: 1772272813
+
+---
+# Query returning error
+version: sql-cache/v1
+kind: SQL
+name: mock-duplicate-key-error
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:14+05:30"
+        operation: "exec"
+        description: "Duplicate key error - demonstrates error response"
+    Request:
+        Query: INSERT INTO users (id, name, email) VALUES (?, ?, ?)
+        Args:
+            - 1
+            - "Duplicate"
+            - "duplicate@example.com"
+        Type: INSERT
+        Tables:
+            - users
+        PlaceholderCount: 3
+        IsDML: true
+        QueryHash: "5abcdef012345678"
+    Response:
+        Error: "Error 1062: Duplicate entry '1' for key 'PRIMARY'"
+        ErrorCode: 1062
+    Created: 1772272814
+
+---
+# SELECT with ORDER BY and LIMIT
+version: sql-cache/v1
+kind: SQL
+name: mock-select-users-paginated
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:15+05:30"
+        operation: "query"
+        description: "Paginated user list - demonstrates ORDER BY and LIMIT"
+    Request:
+        Query: SELECT id, name, email FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?
+        Args:
+            - 10
+            - 0
+        Type: SELECT
+        Tables:
+            - users
+        PlaceholderCount: 2
+        IsDML: true
+        QueryHash: "6abcdef0123456789"
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+        Rows:
+            - - 3
+              - "Charlie"
+              - "charlie@example.com"
+            - - 2
+              - "Bob"
+              - "bob@example.com"
+            - - 1
+              - "Alice"
+              - "alice@example.com"
+        RowCount: 3
+    Created: 1772272815
+
+---
+# Transaction-related: These can be mocked but usually pass through
+# SELECT with NULL handling
+version: sql-cache/v1
+kind: SQL
+name: mock-select-with-null
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:16+05:30"
+        operation: "query"
+        description: "Query with NULL values - demonstrates NULL handling"
+    Request:
+        Query: SELECT id, name, email, manager_id FROM employees WHERE department = ?
+        Args:
+            - "Engineering"
+        Type: SELECT
+        Tables:
+            - employees
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: "7abcdef01234567890"
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+            - manager_id
+        Rows:
+            - - 1
+              - "Alice"
+              - "alice@company.com"
+              - null  # CEO has no manager
+            - - 2
+              - "Bob"
+              - "bob@company.com"
+              - 1
+        RowCount: 2
+    Created: 1772272816
+
+---
+# SELECT with different data types
+version: sql-cache/v1
+kind: SQL
+name: mock-select-various-types
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:17+05:30"
+        operation: "query"
+        description: "Query with various data types - demonstrates type preservation"
+    Request:
+        Query: SELECT id, name, balance, is_active, created_at, data FROM accounts WHERE id = ?
+        Args:
+            - 1
+        Type: SELECT
+        Tables:
+            - accounts
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: "8abcdef012345678901"
+    Response:
+        Columns:
+            - id
+            - name
+            - balance
+            - is_active
+            - created_at
+            - data
+        Rows:
+            - - 1
+              - "Main Account"
+              - 12345.67  # float64
+              - true      # boolean
+              - "2026-02-01T00:00:00Z"  # timestamp
+              - '{"key": "value"}'      # JSON string
+        RowCount: 1
+    Created: 1772272817
+
+---
+# Prepared statement sequence - PREPARE mock
+# These mocks demonstrate how prepared statements are handled
+version: sql-cache/v1
+kind: SQL
+name: mock-prepared-select-user-arg-1
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:18+05:30"
+        operation: "query"
+        description: "Prepared statement execution with arg 1 - first call in sequence"
+    Request:
+        Query: SELECT id, name, email FROM users WHERE id = ?
+        Args:
+            - 1
+        Type: SELECT
+        Tables:
+            - users
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: "9abcdef0123456789012"
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+        Rows:
+            - - 1
+              - "Alice"
+              - "alice@example.com"
+        RowCount: 1
+    Created: 1772272818
+
+---
+# Prepared statement sequence - same query, different arg
+version: sql-cache/v1
+kind: SQL
+name: mock-prepared-select-user-arg-2
+spec:
+    Metadata:
+        recorded_at: "2026-02-28T15:00:19+05:30"
+        operation: "query"
+        description: "Prepared statement execution with arg 2 - second call in sequence"
+    Request:
+        Query: SELECT id, name, email FROM users WHERE id = ?
+        Args:
+            - 2
+        Type: SELECT
+        Tables:
+            - users
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: "9abcdef0123456789012"  # Same hash as arg-1 (same query)
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+        Rows:
+            - - 2
+              - "Bob"
+              - "bob@example.com"
+        RowCount: 1
+    Created: 1772272819
+TestModeInfo:
+    Id: 2
+    sortOrder: 2

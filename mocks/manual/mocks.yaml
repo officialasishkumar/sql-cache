@@ -1,0 +1,56 @@
+version: sql-cache-v1
+kind: SQL
+name: mock-1772270429102005000
+spec:
+    metadata:
+        recorded_at: "2026-02-28T14:50:29+05:30"
+    request:
+        query: SELECT count(*) FROM users
+        type: SELECT
+        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.CountStar->sqlparser.IdentifierCI'
+    response:
+        columns:
+            - count
+        rows:
+            - - 42
+    created: 1772270429
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-1772270429102017000
+spec:
+    metadata:
+        recorded_at: "2026-02-28T14:50:29+05:30"
+    request:
+        query: SELECT name FROM users WHERE active = ?
+        args:
+            - true
+        type: SELECT
+        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.Where->*sqlparser.ComparisonExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Argument'
+    response:
+        columns:
+            - name
+        rows:Check the sequel. 
+            - - Alice
+            - - Bob
+            - - Charlie
+    created: 1772270429
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-1772270429102086000
+spec:
+    metadata:
+        recorded_at: "2026-02-28T14:50:29+05:30"
+    request:
+        query: INSERT INTO users (name) VALUES (?)
+        args:
+            - NewUser
+        type: INSERT
+        structure: '*sqlparser.Insert->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.Columns->sqlparser.IdentifierCI->sqlparser.Values->sqlparser.ValTuple->*sqlparser.Argument'
+    response:
+        last_insert_id: 100
+        rows_affected: 1
+    created: 1772270429

@@ -1,0 +1,58 @@
+version: sql-cache-v1
+kind: SQL
+name: mock-1772270537669598000
+spec:
+    metadata:
+        recorded_at: "2026-02-28T14:52:17+05:30"
+    request:
+        query: SELECT value FROM counter
+        type: SELECT
+        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI'
+    response:
+        columns:
+            - value
+        rows:
+            - - 1
+    created: 1772270537
+    consumed: true
+    sort_order: 1
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-1772270537669599000
+spec:
+    metadata:
+        recorded_at: "2026-02-28T14:52:17+05:30"
+    request:
+        query: SELECT value FROM counter
+        type: SELECT
+        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI'
+    response:
+        columns:
+            - value
+        rows:
+            - - 2
+    created: 1772270537
+    consumed: true
+    sort_order: 2
+
+---
+version: sql-cache-v1
+kind: SQL
+name: mock-1772270537669600000
+spec:
+    metadata:
+        recorded_at: "2026-02-28T14:52:17+05:30"
+    request:
+        query: SELECT value FROM counter
+        type: SELECT
+        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI'
+    response:
+        columns:
+            - value
+        rows:
+            - - 3
+    created: 1772270537
+    consumed: true
+    sort_order: 3
