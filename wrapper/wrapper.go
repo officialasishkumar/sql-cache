@@ -1,7 +1,7 @@
 // Package wrapper provides an easy-to-use wrapper around *sql.DB that
-// intercepts queries and provides mock recording and replay.
-// This allows applications to record database interactions and replay them
-// without needing an actual database connection.
+// intercepts queries and provides SQL response caching.
+// This allows applications to capture database interactions and serve them
+// from cache without needing an actual database connection.
 package wrapper
 
 import (
@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"sync"
 
-	sqlcache "github.com/asish/sql-cache"
+	sqlcache "github.com/officialasishkumar/sql-cache"
 )
 
 // DB wraps a *sql.DB with caching functionality
@@ -29,14 +29,14 @@ type Options struct {
 	// InitialMode is the initial caching mode
 	InitialMode sqlcache.Mode
 
-	// SequentialReplay - if true, mocks are consumed in order
-	SequentialReplay bool
+	// SequentialMode - if true, cache entries are consumed in order
+	SequentialMode bool
 
-	// OnRecord is called when a query is recorded
-	OnRecord func(query string, args []interface{})
+	// OnCapture is called when a query response is captured
+	OnCapture func(query string, args []interface{})
 
-	// OnReplay is called when a query is replayed
-	OnReplay func(query string, args []interface{}, matched bool)
+	// OnCacheHit is called when a query is served from cache
+	OnCacheHit func(query string, args []interface{}, matched bool)
 
 	// OnError is called on errors
 	OnError func(err error, context string)
@@ -45,12 +45,12 @@ type Options struct {
 // Wrap wraps an existing *sql.DB with caching support
 func Wrap(db *sql.DB, opts Options) (*DB, error) {
 	cacheOpts := sqlcache.Options{
-		MockDir:          opts.MockDir,
-		DB:               db,
-		OnRecord:         opts.OnRecord,
-		OnReplay:         opts.OnReplay,
-		OnError:          opts.OnError,
-		SequentialReplay: opts.SequentialReplay,
+		MockDir:        opts.MockDir,
+		DB:             db,
+		OnCapture:      opts.OnCapture,
+		OnCacheHit:     opts.OnCacheHit,
+		OnError:        opts.OnError,
+		SequentialMode: opts.SequentialMode,
 	}
 
 	cache, err := sqlcache.New(cacheOpts)
@@ -68,13 +68,13 @@ func Wrap(db *sql.DB, opts Options) (*DB, error) {
 	}, nil
 }
 
-// NewReplayOnly creates a wrapper for replay-only mode (no database needed)
-func NewReplayOnly(opts Options) (*DB, error) {
+// NewCachedOnly creates a wrapper for cached-only mode (no database needed)
+func NewCachedOnly(opts Options) (*DB, error) {
 	cacheOpts := sqlcache.Options{
-		MockDir:          opts.MockDir,
-		OnReplay:         opts.OnReplay,
-		OnError:          opts.OnError,
-		SequentialReplay: opts.SequentialReplay,
+		MockDir:        opts.MockDir,
+		OnCacheHit:     opts.OnCacheHit,
+		OnError:        opts.OnError,
+		SequentialMode: opts.SequentialMode,
 	}
 
 	cache, err := sqlcache.New(cacheOpts)
@@ -82,7 +82,7 @@ func NewReplayOnly(opts Options) (*DB, error) {
 		return nil, fmt.Errorf("failed to create cache: %w", err)
 	}
 
-	cache.SetMode(sqlcache.ModeReplay)
+	cache.SetMode(sqlcache.ModeCached)
 
 	return &DB{
 		underlying: nil,
@@ -201,7 +201,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 // Ping verifies a connection to the database
 func (db *DB) Ping() error {
 	if db.underlying == nil {
-		return nil // No underlying DB in replay-only mode
+		return nil // No underlying DB in cached-only mode
 	}
 	return db.underlying.Ping()
 }
@@ -245,7 +245,7 @@ func (db *DB) isClosed() bool {
 	return db.closed
 }
 
-// Underlying returns the underlying *sql.DB (may be nil in replay mode)
+// Underlying returns the underlying *sql.DB (may be nil in cached-only mode)
 func (db *DB) Underlying() *sql.DB {
 	return db.underlying
 }
@@ -266,7 +266,7 @@ func (db *DB) Clear() error {
 	return db.cache.Clear()
 }
 
-// Reset resets mock consumption state
+// Reset resets cache entry consumption state
 func (db *DB) Reset() {
 	db.cache.Reset()
 }
@@ -286,19 +286,19 @@ func (db *DB) Stats() sqlcache.CacheStats {
 	return db.cache.Stats()
 }
 
-// Record manually records a query with its response
-func (db *DB) Record(query string, columns []string, rows [][]interface{}, args ...interface{}) error {
-	return db.cache.Record(query, columns, rows, args...)
+// Capture manually stores a query with its response in the cache
+func (db *DB) Capture(query string, columns []string, rows [][]interface{}, args ...interface{}) error {
+	return db.cache.Capture(query, columns, rows, args...)
 }
 
-// RecordExec manually records an exec result
-func (db *DB) RecordExec(query string, lastInsertID, rowsAffected int64, args ...interface{}) error {
-	return db.cache.RecordExec(query, lastInsertID, rowsAffected, args...)
+// CaptureExec manually stores an exec result in the cache
+func (db *DB) CaptureExec(query string, lastInsertID, rowsAffected int64, args ...interface{}) error {
+	return db.cache.CaptureExec(query, lastInsertID, rowsAffected, args...)
 }
 
-// RecordError records an error response
-func (db *DB) RecordError(query string, errMsg string, args ...interface{}) error {
-	return db.cache.RecordError(query, errMsg, args...)
+// CaptureError stores an error response in the cache
+func (db *DB) CaptureError(query string, errMsg string, args ...interface{}) error {
+	return db.cache.CaptureError(query, errMsg, args...)
 }
 
 // =============================================================================

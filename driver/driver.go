@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"sync"
 
-	sqlcache "github.com/asish/sql-cache"
+	sqlcache "github.com/officialasishkumar/sql-cache"
 )
 
 var (
@@ -32,7 +32,7 @@ func WrapDriver(name string, d driver.Driver, cache *sqlcache.Cache) *CachedDriv
 	wrapped := &CachedDriver{
 		underlying: d,
 		cache:      cache,
-		mode:       sqlcache.ModeReplay,
+		mode:       sqlcache.ModeCached,
 	}
 	wrappedDrivers[name] = wrapped
 	
@@ -54,7 +54,7 @@ func Register(name, underlyingDriver string, cache *sqlcache.Cache) error {
 	wrapped := &CachedDriver{
 		underlying: db.Driver(),
 		cache:      cache,
-		mode:       sqlcache.ModeReplay,
+		mode:       sqlcache.ModeCached,
 	}
 	wrappedDrivers[name] = wrapped
 	
@@ -138,7 +138,7 @@ func (c *CachedConn) QueryContext(ctx context.Context, query string, args []driv
 		}
 		return nil, fmt.Errorf("underlying driver does not support QueryContext")
 		
-	case sqlcache.ModeRecord, sqlcache.ModeReplay, sqlcache.ModeReplayFallback:
+	case sqlcache.ModeCapture, sqlcache.ModeCached, sqlcache.ModeCacheFallback:
 		rows, err := c.cache.QueryContext(ctx, query, plainArgs...)
 		if err != nil {
 			return nil, err
@@ -165,7 +165,7 @@ func (c *CachedConn) ExecContext(ctx context.Context, query string, args []drive
 		}
 		return nil, fmt.Errorf("underlying driver does not support ExecContext")
 		
-	case sqlcache.ModeRecord, sqlcache.ModeReplay, sqlcache.ModeReplayFallback:
+	case sqlcache.ModeCapture, sqlcache.ModeCached, sqlcache.ModeCacheFallback:
 		result, err := c.cache.ExecContext(ctx, query, plainArgs...)
 		if err != nil {
 			return nil, err

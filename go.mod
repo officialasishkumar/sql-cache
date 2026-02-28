@@ -1,4 +1,4 @@
-module github.com/asish/sql-cache
+module github.com/officialasishkumar/sql-cache
 
 go 1.24.4
 

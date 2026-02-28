@@ -1,36 +1,36 @@
 # SQL Cache
 
-A Go library for recording and replaying SQL queries using AST-based structural matching. This allows applications to:
+A Go library for capturing and caching SQL query responses using AST-based structural matching. This allows applications to:
 
-1. **Record** SQL queries and responses to YAML mock files
-2. **Replay** responses from mocks without needing a database
-3. **Test** applications without external dependencies
+1. **Capture** SQL query responses and store them in YAML cache files
+2. **Serve** cached responses without needing a database
+3. **Run** applications without external database dependencies
 
 ## Features
 
-- **YAML Recording**: Record SQL interactions to YAML files
+- **YAML Cache Storage**: Store SQL interactions in YAML files
 - **Structural Matching**: Match queries by AST structure (not just exact strings)
-- **Sequential Replay**: Consume mocks in order for predictable tests
-- **Multiple Modes**: Passthrough, Record, Replay, ReplayFallback
-- **No Database Required**: Run tests without a database connection
+- **Sequential Consumption**: Consume cache entries in order for predictable behavior
+- **Multiple Modes**: Passthrough, Capture, Cached, CacheFallback
+- **No Database Required**: Run without a database connection using cached responses
 - **Robust Error Handling**: Never crashes, handles all edge cases
 - **Easy Integration**: Wrap existing `*sql.DB` with minimal code changes
 
 ## Installation
 
 ```bash
-go get github.com/asish/sql-cache
+go get github.com/officialasishkumar/sql-cache
 ```
 
 ## Quick Start
 
-### 1. Record Mode (Against Real Database)
+### 1. Capture Mode (Against Real Database)
 
 ```go
 import (
     "database/sql"
-    sqlcache "github.com/asish/sql-cache"
-    "github.com/asish/sql-cache/wrapper"
+    sqlcache "github.com/officialasishkumar/sql-cache"
+    "github.com/officialasishkumar/sql-cache/wrapper"
     _ "github.com/mattn/go-sqlite3"
 )
 
@@ -40,40 +40,40 @@ func main() {
     
     // Wrap with caching
     cachedDB, _ := wrapper.Wrap(db, wrapper.Options{
-        MockDir:     "./mocks",           // Where to store mock files
-        InitialMode: sqlcache.ModeRecord, // Record all queries
+        MockDir:     "./mocks",            // Where to store cache files
+        InitialMode: sqlcache.ModeCapture, // Capture all query responses
     })
     defer cachedDB.Close()
     
-    // Use like normal - queries are recorded to ./mocks/mocks.yaml
+    // Use like normal - responses are captured to ./mocks/mocks.yaml
     rows, _ := cachedDB.Query("SELECT * FROM users WHERE id = ?", 1)
     // ...
 }
 ```
 
-### 2. Replay Mode (No Database Needed)
+### 2. Cached Mode (No Database Needed)
 
 ```go
-// Create replay-only wrapper (no database!)
-cachedDB, _ := wrapper.NewReplayOnly(wrapper.Options{
-    MockDir:          "./mocks",
-    SequentialReplay: true, // Each mock used once
+// Create cached-only wrapper (no database!)
+cachedDB, _ := wrapper.NewCachedOnly(wrapper.Options{
+    MockDir:        "./mocks",
+    SequentialMode: true, // Each entry used once
 })
 defer cachedDB.Close()
 
-// Same queries return mocked responses
+// Same queries return cached responses
 rows, _ := cachedDB.Query("SELECT * FROM users WHERE id = ?", 1)
 ```
 
-### 3. Manual Mock Recording (For Unit Tests)
+### 3. Manual Cache Capture
 
 ```go
 cache, _ := sqlcache.New(sqlcache.Options{
     MockDir: "./test-mocks",
 })
 
-// Record mock data manually
-cache.Record(
+// Capture query data manually
+cache.Capture(
     "SELECT * FROM products WHERE category = ?",
     []string{"id", "name", "price"},  // columns
     [][]interface{}{                   // rows
@@ -83,22 +83,22 @@ cache.Record(
     "electronics", // args
 )
 
-// Record exec result
-cache.RecordExec(
+// Capture exec result
+cache.CaptureExec(
     "INSERT INTO users (name) VALUES (?)",
     100, // lastInsertID
     1,   // rowsAffected
     "NewUser",
 )
 
-// Record error response
-cache.RecordError(
+// Capture error response
+cache.CaptureError(
     "SELECT * FROM nonexistent",
     "table not found",
 )
 
-// Use in replay mode
-cache.SetMode(sqlcache.ModeReplay)
+// Use in cached mode
+cache.SetMode(sqlcache.ModeCached)
 rows, _ := cache.Query("SELECT * FROM products WHERE category = ?", "electronics")
 ```
 
@@ -107,13 +107,13 @@ rows, _ := cache.Query("SELECT * FROM products WHERE category = ?", "electronics
 | Mode | Description |
 |------|-------------|
 | `ModePassthrough` | Execute queries against DB, no caching |
-| `ModeRecord` | Execute queries and save responses as mocks |
-| `ModeReplay` | Return mocked responses, error if not found |
-| `ModeReplayFallback` | Return mocked responses, fall back to DB if not found |
+| `ModeCapture` | Execute queries and save responses as cache entries |
+| `ModeCached` | Return cached responses, error if not found |
+| `ModeCacheFallback` | Return cached responses, fall back to DB if not found |
 
-## Mock File Format (YAML)
+## Cache File Format (YAML)
 
-Mocks are stored in `mocks.yaml` using a robust format optimized for structural matching and easy debugging:
+Cache entries are stored in `mocks.yaml` using a robust format optimized for structural matching and easy debugging:
 
 ```yaml
 version: sql-cache-v1
@@ -148,12 +148,12 @@ spec:
     created: 1772270550
     req_timestamp: 1772270550000000000
     res_timestamp: 1772270550100000000
-test_mode_info:                   # Test tracking
+CacheEntryInfo:                   # Entry tracking
     id: 1
     is_filtered: false
     sort_order: 1
 ---
-# Additional mocks separated by ---
+# Additional entries separated by ---
 ```
 
 ### Key Fields Explained
@@ -164,7 +164,7 @@ test_mode_info:                   # Test tracking
 | `placeholder_count` | Number of `?` placeholders - must match for prepared statements |
 | `is_dml` | Whether query is DML (SELECT/INSERT/UPDATE/DELETE) |
 | `query_hash` | SHA256 hash for fast exact matching |
-| `test_mode_info` | Tracks mock usage during test runs |
+| `CacheEntryInfo` | Tracks entry usage during sequential consumption |
 
 ## Matching Strategy
 
@@ -182,40 +182,40 @@ This means slightly different queries can still match:
 "SELECT * FROM users WHERE id = 2"  // Different value, same structure
 ```
 
-## Sequential Replay
+## Sequential Consumption
 
-When `SequentialReplay: true`, each mock can only be used once:
+When `SequentialMode: true`, each cache entry can only be used once:
 
 ```go
 cache, _ := sqlcache.New(sqlcache.Options{
-    MockDir:          "./mocks",
-    SequentialReplay: true,
+    MockDir:        "./mocks",
+    SequentialMode: true,
 })
 
-// Record same query 3 times with different results
-cache.Record("SELECT value FROM counter", []string{"value"}, [][]interface{}{{1}})
-cache.Record("SELECT value FROM counter", []string{"value"}, [][]interface{}{{2}})
-cache.Record("SELECT value FROM counter", []string{"value"}, [][]interface{}{{3}})
+// Capture same query 3 times with different results
+cache.Capture("SELECT value FROM counter", []string{"value"}, [][]interface{}{{1}})
+cache.Capture("SELECT value FROM counter", []string{"value"}, [][]interface{}{{2}})
+cache.Capture("SELECT value FROM counter", []string{"value"}, [][]interface{}{{3}})
 
-cache.SetMode(sqlcache.ModeReplay)
+cache.SetMode(sqlcache.ModeCached)
 
-// Each query consumes the next mock
+// Each query consumes the next entry
 rows, _ := cache.Query("SELECT value FROM counter") // Returns 1
 rows, _ = cache.Query("SELECT value FROM counter")  // Returns 2
 rows, _ = cache.Query("SELECT value FROM counter")  // Returns 3
-rows, _ = cache.Query("SELECT value FROM counter")  // Error: no more mocks!
+rows, _ = cache.Query("SELECT value FROM counter")  // Error: no more entries!
 ```
 
-## Integration Testing
+## Integration Usage
 
 Set `SQL_CACHE_MODE` environment variable:
 
 ```bash
-# First run: record against real database
-SQL_CACHE_MODE=record go test ./...
+# First run: capture from real database
+SQL_CACHE_MODE=capture go run ./...
 
-# Subsequent runs: replay from mocks (fast, no DB needed)
-SQL_CACHE_MODE=replay go test ./...
+# Subsequent runs: serve from cache (fast, no DB needed)
+SQL_CACHE_MODE=cached go run ./...
 ```
 
 ## API Reference
@@ -224,13 +224,13 @@ SQL_CACHE_MODE=replay go test ./...
 
 ```go
 type Options struct {
-    MockDir          string                                    // Directory for mock files
-    DB               *sql.DB                                   // Optional DB connection
-    SequentialReplay bool                                      // Consume mocks in order
-    OnRecord         func(query string, args []interface{})    // Record callback
-    OnReplay         func(query string, args []interface{}, matched bool) // Replay callback
-    OnError          func(err error, context string)           // Error callback
-    Logger           *log.Logger                               // Debug logger
+    MockDir        string                                    // Directory for cache files
+    DB             *sql.DB                                   // Optional DB connection
+    SequentialMode bool                                      // Consume entries in order
+    OnCapture      func(query string, args []interface{})    // Capture callback
+    OnCacheHit     func(query string, args []interface{}, matched bool) // Cache hit callback
+    OnError        func(err error, context string)           // Error callback
+    Logger         *log.Logger                               // Debug logger
 }
 ```
 
@@ -238,12 +238,12 @@ type Options struct {
 
 ```go
 type Options struct {
-    MockDir          string          // Directory for mock files
-    InitialMode      sqlcache.Mode   // Starting mode
-    SequentialReplay bool            // Consume mocks in order
-    OnRecord         func(...)       // Callbacks
-    OnReplay         func(...)
-    OnError          func(...)
+    MockDir        string          // Directory for cache files
+    InitialMode    sqlcache.Mode   // Starting mode
+    SequentialMode bool            // Consume entries in order
+    OnCapture      func(...)       // Callbacks
+    OnCacheHit     func(...)
+    OnError        func(...)
 }
 ```
 
@@ -254,31 +254,31 @@ type Options struct {
 cache.SetMode(mode)                    // Set operating mode
 cache.Query(query, args...)            // Execute SELECT
 cache.Exec(query, args...)             // Execute INSERT/UPDATE/DELETE
-cache.Record(query, cols, rows, args)  // Manual mock recording
-cache.RecordExec(query, lastID, affected, args)
-cache.RecordError(query, errMsg, args)
-cache.Save()                           // Persist mocks to disk
-cache.Load()                           // Load mocks from disk
-cache.Clear()                          // Remove all mocks
+cache.Capture(query, cols, rows, args) // Manual cache capture
+cache.CaptureExec(query, lastID, affected, args)
+cache.CaptureError(query, errMsg, args)
+cache.Save()                           // Persist cache to disk
+cache.Load()                           // Load cache from disk
+cache.Clear()                          // Remove all entries
 cache.Reset()                          // Reset consumed states
 cache.Stats()                          // Get statistics
 
-// Cache Invalidation (for production caching)
-cache.InvalidateByQuery(query)         // Remove mocks matching exact query
-cache.InvalidateByTable(tableName)     // Remove all mocks for a table
-cache.InvalidateByPattern(pattern)     // Remove mocks matching pattern (wildcards)
-cache.InvalidateAll()                  // Clear all mocks
-cache.SetTTL(seconds)                  // Set time-to-live for mocks
+// Cache Invalidation
+cache.InvalidateByQuery(query)         // Remove entries matching exact query
+cache.InvalidateByTable(tableName)     // Remove all entries for a table
+cache.InvalidateByPattern(pattern)     // Remove entries matching pattern (wildcards)
+cache.InvalidateAll()                  // Clear all entries
+cache.SetTTL(seconds)                  // Set time-to-live for entries
 
 // Wrapper
 wrapper.Wrap(db, opts)                 // Wrap existing *sql.DB
-wrapper.NewReplayOnly(opts)            // Create replay-only wrapper
+wrapper.NewCachedOnly(opts)            // Create cached-only wrapper
 db.SetMode(mode)                       // Set mode
 db.Query/Exec/QueryRow(...)            // Same as sql.DB
-db.Record/RecordExec/RecordError(...)  // Manual recording
+db.Capture/CaptureExec/CaptureError(...)  // Manual capture
 ```
 
-## Cache Invalidation (Production Use)
+## Cache Invalidation
 
 For production caching scenarios, you can invalidate cached data:
 
@@ -298,7 +298,7 @@ func (s *UserService) UpdateUser(id int, name string) error {
 // Pattern-based invalidation
 cache.InvalidateByPattern("SELECT * FROM users*")  // Invalidate all user queries
 
-// TTL-based expiration (mocks older than TTL are ignored)
+// TTL-based expiration (entries older than TTL are ignored)
 cache.SetTTL(3600) // 1 hour TTL
 ```
 
@@ -306,9 +306,9 @@ cache.SetTTL(3600) // 1 hour TTL
 
 See the [examples](./examples) directory:
 
-- **basic**: Simple record/replay usage
+- **basic**: Simple capture/cache usage
 - **integration**: Environment-based mode switching
-- **testing**: Unit testing without database
+- **testing**: Service usage without database
 
 ## Project Structure
 
@@ -322,7 +322,7 @@ sql-cache/
 ├── matcher/
 │   └── matcher.go     # AST-based query matching
 ├── mock/
-│   └── mock.go        # YAML mock storage
+│   └── mock.go        # YAML cache entry storage
 ├── wrapper/
 │   └── wrapper.go     # *sql.DB wrapper
 ├── driver/
@@ -330,7 +330,7 @@ sql-cache/
 └── examples/
     ├── basic/         # Basic usage examples
     ├── integration/   # Integration patterns
-    └── testing/       # Testing examples
+    └── testing/       # Service examples
 ```
 
 ## Inspiration
@@ -341,8 +341,8 @@ This library uses battle-tested AST-based matching algorithms. Key concepts:
 - **Placeholder count validation** - queries must have same number of `?` placeholders
 - **DML type checking** - SELECT can only match SELECT, INSERT only matches INSERT, etc.
 - **Parameter value matching** - type-flexible comparison (int/int64/float64 interoperability)
-- **YAML mock file format** for easy inspection and modification
-- **Sequential mock consumption** for predictable test behavior
+- **YAML cache file format** for easy inspection and modification
+- **Sequential entry consumption** for predictable behavior
 - **Scoring-based match selection** with definitive and best-effort matching
 
 The matching algorithm has been battle-tested and provides production-grade reliability.

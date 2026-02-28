@@ -1,5 +1,5 @@
 // Example: Basic usage of SQL cache
-// This demonstrates how to use sql-cache for mock recording and replay.
+// This demonstrates how to use sql-cache for capturing and caching SQL responses.
 package main
 
 import (
@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"log"
 
-	sqlcache "github.com/asish/sql-cache"
-	"github.com/asish/sql-cache/wrapper"
+	sqlcache "github.com/officialasishkumar/sql-cache"
+	"github.com/officialasishkumar/sql-cache/wrapper"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -20,11 +20,11 @@ func main() {
 	fmt.Println("\n=== Example 2: Direct Cache API ===")
 	directCacheExample()
 
-	fmt.Println("\n=== Example 3: Manual Mock Recording ===")
-	manualRecordExample()
+	fmt.Println("\n=== Example 3: Manual Cache Capture ===")
+	manualCaptureExample()
 
-	fmt.Println("\n=== Example 4: Replay-Only Mode ===")
-	replayOnlyExample()
+	fmt.Println("\n=== Example 4: Cached-Only Mode ===")
+	cachedOnlyExample()
 }
 
 func basicWrapperExample() {
@@ -41,11 +41,11 @@ func basicWrapperExample() {
 
 	// Wrap with caching support
 	cachedDB, err := wrapper.Wrap(db, wrapper.Options{
-		MockDir:          "./mocks",
-		InitialMode:      sqlcache.ModeRecord, // Record queries and responses
-		SequentialReplay: true,                // Sequential mock consumption
-		OnRecord: func(query string, args []interface{}) {
-			fmt.Printf("  [RECORDED] %s with args %v\n", truncate(query, 50), args)
+		MockDir:        "./mocks",
+		InitialMode:    sqlcache.ModeCapture, // Capture queries and responses
+		SequentialMode: true,                 // Sequential cache consumption
+		OnCapture: func(query string, args []interface{}) {
+			fmt.Printf("  [CAPTURED] %s with args %v\n", truncate(query, 50), args)
 		},
 	})
 	if err != nil {
@@ -63,11 +63,11 @@ func basicWrapperExample() {
 	}
 	fmt.Printf("  Result: id=%d, name=%s, email=%s\n", id, name, email)
 
-	// Switch to replay mode
-	cachedDB.SetMode(sqlcache.ModeReplay)
+	// Switch to cached mode
+	cachedDB.SetMode(sqlcache.ModeCached)
 
-	// Same query now returns from mock
-	fmt.Println("\nSecond query (replay mode - from mock):")
+	// Same query now returns from cache
+	fmt.Println("\nSecond query (cached mode - from cache):")
 	row = cachedDB.QueryRow("SELECT id, name, email FROM users WHERE id = ?", 1)
 	if err := row.Scan(&id, &name, &email); err != nil {
 		log.Fatal(err)
@@ -89,8 +89,8 @@ func directCacheExample() {
 	}
 	defer cache.Close()
 
-	// Manually record mock data
-	err = cache.Record(
+	// Manually capture cache data
+	err = cache.Capture(
 		"SELECT * FROM products WHERE category = ?",
 		[]string{"id", "name", "price"},
 		[][]interface{}{
@@ -103,16 +103,16 @@ func directCacheExample() {
 		log.Fatal(err)
 	}
 
-	// Switch to replay mode
-	cache.SetMode(sqlcache.ModeReplay)
+	// Switch to cached mode
+	cache.SetMode(sqlcache.ModeCached)
 
-	// Query from mock
+	// Query from cache
 	rows, err := cache.Query("SELECT * FROM products WHERE category = ?", "electronics")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Products from mock:")
+	fmt.Println("Products from cache:")
 	for rows.Next() {
 		var id int
 		var name string
@@ -124,7 +124,7 @@ func directCacheExample() {
 	}
 }
 
-func manualRecordExample() {
+func manualCaptureExample() {
 	cache, err := sqlcache.New(sqlcache.Options{
 		MockDir: "./mocks/manual",
 	})
@@ -133,30 +133,30 @@ func manualRecordExample() {
 	}
 	defer cache.Close()
 
-	// Record various queries
-	cache.Record(
+	// Capture various queries
+	cache.Capture(
 		"SELECT count(*) FROM users",
 		[]string{"count"},
 		[][]interface{}{{42}},
 	)
 
-	cache.Record(
+	cache.Capture(
 		"SELECT name FROM users WHERE active = ?",
 		[]string{"name"},
 		[][]interface{}{{"Alice"}, {"Bob"}, {"Charlie"}},
 		true,
 	)
 
-	// Record an exec result
-	cache.RecordExec(
+	// Capture an exec result
+	cache.CaptureExec(
 		"INSERT INTO users (name) VALUES (?)",
 		100, // lastInsertID
 		1,   // rowsAffected
 		"NewUser",
 	)
 
-	// Replay mode
-	cache.SetMode(sqlcache.ModeReplay)
+	// Cached mode
+	cache.SetMode(sqlcache.ModeCached)
 
 	// Query count
 	rows, _ := cache.Query("SELECT count(*) FROM users")
@@ -182,16 +182,16 @@ func manualRecordExample() {
 	fmt.Printf("Insert result: lastID=%d, affected=%d\n", lastID, affected)
 }
 
-func replayOnlyExample() {
-	// Create wrapper without database (replay-only)
-	db, err := wrapper.NewReplayOnly(wrapper.Options{
-		MockDir:          "./mocks",
-		SequentialReplay: true,
-		OnReplay: func(query string, args []interface{}, matched bool) {
+func cachedOnlyExample() {
+	// Create wrapper without database (cached-only)
+	db, err := wrapper.NewCachedOnly(wrapper.Options{
+		MockDir:        "./mocks",
+		SequentialMode: true,
+		OnCacheHit: func(query string, args []interface{}, matched bool) {
 			if matched {
-				fmt.Printf("  [REPLAY] %s -> matched\n", truncate(query, 40))
+				fmt.Printf("  [CACHE HIT] %s -> matched\n", truncate(query, 40))
 			} else {
-				fmt.Printf("  [REPLAY] %s -> NOT FOUND\n", truncate(query, 40))
+				fmt.Printf("  [CACHE MISS] %s -> NOT FOUND\n", truncate(query, 40))
 			}
 		},
 	})
@@ -200,8 +200,8 @@ func replayOnlyExample() {
 	}
 	defer db.Close()
 
-	// First, let's record some mocks manually
-	db.Record(
+	// First, let's capture some entries manually
+	db.Capture(
 		"SELECT * FROM config WHERE key = ?",
 		[]string{"key", "value"},
 		[][]interface{}{{"app_name", "MyApp"}},

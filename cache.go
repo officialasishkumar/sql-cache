@@ -1,10 +1,10 @@
 // Package sqlcache provides a robust SQL query caching layer that intercepts SQL calls,
-// generates mocks for them, and returns cached responses for similar queries.
+// stores responses in YAML files, and returns cached responses for matching queries.
 //
 // The library supports:
-// - Recording SQL queries and responses to YAML mock files
-// - Replaying responses from mocks with structural matching
-// - Sequential mock consumption for predictable test replay
+// - Capturing SQL queries and responses to YAML cache files
+// - Returning cached responses with structural matching
+// - Sequential cache consumption for predictable ordering
 // - Multiple match levels (exact, structural, type-based)
 // - Robust error handling that never crashes
 //
@@ -15,13 +15,13 @@
 //	})
 //	defer cache.Close()
 //
-//	// Record mode: execute queries and cache responses
-//	cache.SetMode(sqlcache.ModeRecord)
+//	// Capture mode: execute queries and store responses
+//	cache.SetMode(sqlcache.ModeCapture)
 //	rows, _ := cache.Query("SELECT * FROM users WHERE id = ?", 1)
 //
-//	// Replay mode: return cached responses
-//	cache.SetMode(sqlcache.ModeReplay)
-//	rows, _ := cache.Query("SELECT * FROM users WHERE id = ?", 1) // Returns from mock
+//	// Cached mode: return stored responses
+//	cache.SetMode(sqlcache.ModeCached)
+//	rows, _ := cache.Query("SELECT * FROM users WHERE id = ?", 1) // Returns from cache
 package sqlcache
 
 import (
@@ -34,8 +34,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/asish/sql-cache/matcher"
-	"github.com/asish/sql-cache/mock"
+	"github.com/officialasishkumar/sql-cache/matcher"
+	"github.com/officialasishkumar/sql-cache/mock"
 )
 
 // Mode determines how the cache behaves
@@ -45,26 +45,26 @@ const (
 	// ModePassthrough - execute queries against DB without caching
 	ModePassthrough Mode = iota
 
-	// ModeRecord - execute queries and save responses as mocks
-	ModeRecord
+	// ModeCapture - execute queries and save responses as cache entries
+	ModeCapture
 
-	// ModeReplay - return mocked responses, error if not found
-	ModeReplay
+	// ModeCached - return cached responses, error if not found
+	ModeCached
 
-	// ModeReplayFallback - return mocked responses, fall back to DB if not found
-	ModeReplayFallback
+	// ModeCacheFallback - return cached responses, fall back to DB if not found
+	ModeCacheFallback
 )
 
 func (m Mode) String() string {
 	switch m {
 	case ModePassthrough:
 		return "passthrough"
-	case ModeRecord:
-		return "record"
-	case ModeReplay:
-		return "replay"
-	case ModeReplayFallback:
-		return "replay-fallback"
+	case ModeCapture:
+		return "capture"
+	case ModeCached:
+		return "cached"
+	case ModeCacheFallback:
+		return "cache-fallback"
 	default:
 		return "unknown"
 	}
@@ -78,11 +78,11 @@ type Options struct {
 	// DB is the underlying database connection (optional for pure replay)
 	DB *sql.DB
 
-	// OnRecord is called when a query is recorded
-	OnRecord func(query string, args []interface{})
+	// OnCapture is called when a query response is captured
+	OnCapture func(query string, args []interface{})
 
-	// OnReplay is called when a query is replayed from mock
-	OnReplay func(query string, args []interface{}, matched bool)
+	// OnCacheHit is called when a query is served from cache
+	OnCacheHit func(query string, args []interface{}, matched bool)
 
 	// OnError is called when an error occurs (for logging)
 	OnError func(err error, context string)
@@ -90,9 +90,9 @@ type Options struct {
 	// Logger for debug output (optional)
 	Logger *log.Logger
 
-	// SequentialReplay - if true, mocks are consumed in order and can only be used once
-	// This enables predictable test replay behavior
-	SequentialReplay bool
+	// SequentialMode - if true, cache entries are consumed in order and can only be used once
+	// This enables predictable sequential consumption behavior
+	SequentialMode bool
 }
 
 // Cache is the main SQL caching interface
@@ -115,7 +115,7 @@ type CacheStats struct {
 	Hits         int64  `json:"hits"`
 	Misses       int64  `json:"misses"`
 	Errors       int64  `json:"errors"`
-	Recorded     int64  `json:"recorded"`
+	Captured     int64  `json:"captured"`
 	HitRate      float64 `json:"hit_rate"`
 }
 
@@ -175,8 +175,8 @@ func (c *Cache) SetMode(mode Mode) {
 	defer c.mu.Unlock()
 	c.mode = mode
 
-	// Reset mock consumption state when switching to replay
-	if mode == ModeReplay || mode == ModeReplayFallback {
+	// Reset cache consumption state when switching to cached mode
+	if mode == ModeCached || mode == ModeCacheFallback {
 		c.mocks.Reset()
 	}
 }
@@ -211,14 +211,14 @@ func (c *Cache) QueryContext(ctx context.Context, query string, args ...interfac
 	case ModePassthrough:
 		return c.executeQuery(ctx, db, query, args)
 
-	case ModeRecord:
-		return c.recordQuery(ctx, db, query, args)
+	case ModeCapture:
+		return c.captureQuery(ctx, db, query, args)
 
-	case ModeReplay:
-		return c.replayQuery(ctx, nil, query, args, true)
+	case ModeCached:
+		return c.cachedQuery(ctx, nil, query, args, true)
 
-	case ModeReplayFallback:
-		return c.replayQuery(ctx, db, query, args, false)
+	case ModeCacheFallback:
+		return c.cachedQuery(ctx, db, query, args, false)
 	}
 
 	return nil, ErrInvalidMode
@@ -246,24 +246,24 @@ func (c *Cache) ExecContext(ctx context.Context, query string, args ...interface
 	case ModePassthrough:
 		return c.executeExec(ctx, db, query, args)
 
-	case ModeRecord:
-		return c.recordExec(ctx, db, query, args)
+	case ModeCapture:
+		return c.captureExec(ctx, db, query, args)
 
-	case ModeReplay:
-		return c.replayExec(ctx, nil, query, args, true)
+	case ModeCached:
+		return c.cachedExec(ctx, nil, query, args, true)
 
-	case ModeReplayFallback:
-		return c.replayExec(ctx, db, query, args, false)
+	case ModeCacheFallback:
+		return c.cachedExec(ctx, db, query, args, false)
 	}
 
 	return nil, ErrInvalidMode
 }
 
 // =============================================================================
-// Record Mode Implementation
+// Capture Mode Implementation
 // =============================================================================
 
-func (c *Cache) recordQuery(ctx context.Context, db *sql.DB, query string, args []interface{}) (*CachedRows, error) {
+func (c *Cache) captureQuery(ctx context.Context, db *sql.DB, query string, args []interface{}) (*CachedRows, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
 	}
@@ -272,8 +272,8 @@ func (c *Cache) recordQuery(ctx context.Context, db *sql.DB, query string, args 
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		c.incrementErrors()
-		// Record the error response
-		c.recordMock(query, args, nil, nil, 0, 0, err.Error())
+		// Capture the error response
+		c.captureMock(query, args, nil, nil, 0, 0, err.Error())
 		return nil, err
 	}
 
@@ -284,21 +284,21 @@ func (c *Cache) recordQuery(ctx context.Context, db *sql.DB, query string, args 
 		return nil, err
 	}
 
-	// Record the successful response
-	c.recordMock(query, args, cachedRows.columns, cachedRows.rows, 0, 0, "")
+	// Capture the successful response
+	c.captureMock(query, args, cachedRows.columns, cachedRows.rows, 0, 0, "")
 
 	c.mu.Lock()
-	c.stats.Recorded++
+	c.stats.Captured++
 	c.mu.Unlock()
 
-	if c.options.OnRecord != nil {
-		c.options.OnRecord(query, args)
+	if c.options.OnCapture != nil {
+		c.options.OnCapture(query, args)
 	}
 
 	return cachedRows, nil
 }
 
-func (c *Cache) recordExec(ctx context.Context, db *sql.DB, query string, args []interface{}) (*CachedResult, error) {
+func (c *Cache) captureExec(ctx context.Context, db *sql.DB, query string, args []interface{}) (*CachedResult, error) {
 	if db == nil {
 		return nil, ErrNoDatabase
 	}
@@ -306,29 +306,29 @@ func (c *Cache) recordExec(ctx context.Context, db *sql.DB, query string, args [
 	result, err := db.ExecContext(ctx, query, args...)
 	if err != nil {
 		c.incrementErrors()
-		// Record error
-		c.recordMock(query, args, nil, nil, 0, 0, err.Error())
+		// Capture error
+		c.captureMock(query, args, nil, nil, 0, 0, err.Error())
 		return nil, err
 	}
 
 	lastID, _ := result.LastInsertId()
 	affected, _ := result.RowsAffected()
 
-	// Record success
-	c.recordMock(query, args, nil, nil, lastID, affected, "")
+	// Capture success
+	c.captureMock(query, args, nil, nil, lastID, affected, "")
 
 	c.mu.Lock()
-	c.stats.Recorded++
+	c.stats.Captured++
 	c.mu.Unlock()
 
-	if c.options.OnRecord != nil {
-		c.options.OnRecord(query, args)
+	if c.options.OnCapture != nil {
+		c.options.OnCapture(query, args)
 	}
 
 	return &CachedResult{lastInsertID: lastID, rowsAffected: affected}, nil
 }
 
-func (c *Cache) recordMock(query string, args []interface{}, columns []string, rows [][]interface{}, lastInsertID, rowsAffected int64, errMsg string) {
+func (c *Cache) captureMock(query string, args []interface{}, columns []string, rows [][]interface{}, lastInsertID, rowsAffected int64, errMsg string) {
 	// Get query structure for matching
 	var structure, queryType string
 	var tables []string
@@ -388,15 +388,15 @@ func (c *Cache) recordMock(query string, args []interface{}, columns []string, r
 	}
 
 	if err := c.mocks.Add(m); err != nil {
-		c.logError(err, "adding mock")
+		c.logError(err, "adding cache entry")
 	}
 }
 
 // =============================================================================
-// Replay Mode Implementation
+// Cached Mode Implementation
 // =============================================================================
 
-func (c *Cache) replayQuery(ctx context.Context, db *sql.DB, query string, args []interface{}, strict bool) (*CachedRows, error) {
+func (c *Cache) cachedQuery(ctx context.Context, db *sql.DB, query string, args []interface{}, strict bool) (*CachedRows, error) {
 	// Check for control statements that don't need mocking
 	if matcher.IsControlStatement(query) {
 		return &CachedRows{columns: []string{}, rows: [][]interface{}{}, rowIndex: -1}, nil
@@ -409,17 +409,17 @@ func (c *Cache) replayQuery(ctx context.Context, db *sql.DB, query string, args 
 		queryType = c.getQueryType(query)
 	}
 
-	// Find matching mock (with optional consumption for sequential replay)
-	matched, found := c.mocks.FindMatch(query, queryType, structure, args, c.options.SequentialReplay)
+	// Find matching cache entry (with optional consumption for sequential mode)
+	matched, found := c.mocks.FindMatch(query, queryType, structure, args, c.options.SequentialMode)
 
-	if c.options.OnReplay != nil {
-		c.options.OnReplay(query, args, found)
+	if c.options.OnCacheHit != nil {
+		c.options.OnCacheHit(query, args, found)
 	}
 
 	if found {
 		c.incrementHits()
 
-		// Check if mock recorded an error
+		// Check if cache entry contains an error
 		if matched.Spec.Response.Error != "" {
 			return nil, errors.New(matched.Spec.Response.Error)
 		}
@@ -431,7 +431,7 @@ func (c *Cache) replayQuery(ctx context.Context, db *sql.DB, query string, args 
 		}, nil
 	}
 
-	// Mock not found
+	// Cache entry not found
 	c.incrementMisses()
 
 	if strict {
@@ -447,7 +447,7 @@ func (c *Cache) replayQuery(ctx context.Context, db *sql.DB, query string, args 
 	return c.executeQuery(ctx, db, query, args)
 }
 
-func (c *Cache) replayExec(ctx context.Context, db *sql.DB, query string, args []interface{}, strict bool) (*CachedResult, error) {
+func (c *Cache) cachedExec(ctx context.Context, db *sql.DB, query string, args []interface{}, strict bool) (*CachedResult, error) {
 	// Control statements - return success
 	if matcher.IsControlStatement(query) {
 		return &CachedResult{lastInsertID: 0, rowsAffected: 0}, nil
@@ -459,10 +459,10 @@ func (c *Cache) replayExec(ctx context.Context, db *sql.DB, query string, args [
 		queryType = c.getQueryType(query)
 	}
 
-	matched, found := c.mocks.FindMatch(query, queryType, structure, args, c.options.SequentialReplay)
+	matched, found := c.mocks.FindMatch(query, queryType, structure, args, c.options.SequentialMode)
 
-	if c.options.OnReplay != nil {
-		c.options.OnReplay(query, args, found)
+	if c.options.OnCacheHit != nil {
+		c.options.OnCacheHit(query, args, found)
 	}
 
 	if found {
@@ -528,24 +528,24 @@ func (c *Cache) executeExec(ctx context.Context, db *sql.DB, query string, args 
 }
 
 // =============================================================================
-// Manual Recording API
+// Manual Capture API
 // =============================================================================
 
-// Record manually records a mock for a query
-func (c *Cache) Record(query string, columns []string, rows [][]interface{}, args ...interface{}) error {
-	c.recordMock(query, args, columns, rows, 0, 0, "")
+// Capture manually stores a cache entry for a query
+func (c *Cache) Capture(query string, columns []string, rows [][]interface{}, args ...interface{}) error {
+	c.captureMock(query, args, columns, rows, 0, 0, "")
 	return nil
 }
 
-// RecordExec manually records a mock for an exec query
-func (c *Cache) RecordExec(query string, lastInsertID, rowsAffected int64, args ...interface{}) error {
-	c.recordMock(query, args, nil, nil, lastInsertID, rowsAffected, "")
+// CaptureExec manually stores a cache entry for an exec query
+func (c *Cache) CaptureExec(query string, lastInsertID, rowsAffected int64, args ...interface{}) error {
+	c.captureMock(query, args, nil, nil, lastInsertID, rowsAffected, "")
 	return nil
 }
 
-// RecordError records an error response for a query
-func (c *Cache) RecordError(query string, errMsg string, args ...interface{}) error {
-	c.recordMock(query, args, nil, nil, 0, 0, errMsg)
+// CaptureError stores an error response for a query
+func (c *Cache) CaptureError(query string, errMsg string, args ...interface{}) error {
+	c.captureMock(query, args, nil, nil, 0, 0, errMsg)
 	return nil
 }
 
@@ -569,7 +569,7 @@ func (c *Cache) Clear() error {
 	return nil
 }
 
-// Reset resets mock consumption state (for re-replay)
+// Reset resets cache entry consumption state (for re-use)
 func (c *Cache) Reset() {
 	c.mocks.Reset()
 }

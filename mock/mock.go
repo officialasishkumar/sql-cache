@@ -1,17 +1,17 @@
-// Package mock provides mock recording and replay for SQL queries.
-// Mocks are stored in YAML format for easy inspection and modification.
+// Package mock provides cache entry storage and retrieval for SQL queries.
+// Entries are stored in YAML format for easy inspection and modification.
 // The matching logic uses battle-tested AST-based algorithms.
 //
 // Key features:
 // - AST structure-based matching using vitess sqlparser
 // - Placeholder count verification for prepared statements
 // - DML type checking (SELECT vs INSERT/UPDATE/DELETE)
-// - Sequential replay support with consumption tracking
+// - Sequential consumption support with tracking
 // - Type-flexible argument matching
 // - TTL support for cache expiration
 // - Pattern-based invalidation
 //
-// The mock format is designed to be compatible with common mock systems while
+// The cache entry format is designed to be compatible with common mock systems while
 // being optimized for higher-level SQL interception (vs wire protocol).
 package mock
 
@@ -35,21 +35,21 @@ import (
 // Version is the mock format version
 const Version = "sql-cache/v1"
 
-// Mock represents a recorded SQL interaction
-// This format is designed for SQL query caching/mocking.
+// Mock represents a cached SQL interaction
+// This format is designed for SQL query caching.
 //
 // The structure is optimized for SQL-specific fields.
 type Mock struct {
-	Version      string       `yaml:"version"`                  // API version (sql-cache/v1)
-	Kind         string       `yaml:"kind"`                     // Always "SQL" for this implementation
-	Name         string       `yaml:"name"`                     // Unique mock identifier
-	Spec         MockSpec     `yaml:"spec"`                     // The actual mock data
-	TestModeInfo TestModeInfo `yaml:"TestModeInfo,omitempty"`   // Test mode tracking
-	ConnectionID string       `yaml:"ConnectionId,omitempty"`   // For connection-aware matching
+	Version        string         `yaml:"version"`                      // API version (sql-cache/v1)
+	Kind           string         `yaml:"kind"`                         // Always "SQL" for this implementation
+	Name           string         `yaml:"name"`                         // Unique cache entry identifier
+	Spec           MockSpec       `yaml:"spec"`                         // The actual cache data
+	CacheEntryInfo CacheEntryInfo `yaml:"CacheEntryInfo,omitempty"`     // Cache entry tracking
+	ConnectionID   string         `yaml:"ConnectionId,omitempty"`       // For connection-aware matching
 }
 
-// TestModeInfo tracks mock usage during test mode
-type TestModeInfo struct {
+// CacheEntryInfo tracks cache entry usage
+type CacheEntryInfo struct {
 	ID         int   `yaml:"Id,omitempty"`         // Sequence ID
 	IsFiltered bool  `yaml:"isFiltered,omitempty"` // Whether filtered during matching
 	SortOrder  int64 `yaml:"sortOrder,omitempty"`  // Order in which mock was consumed
@@ -61,7 +61,7 @@ type MockSpec struct {
 	Request   RequestSpec       `yaml:"Request"`                         // The SQL request
 	Response  ResponseSpec      `yaml:"Response"`                        // The SQL response
 	Created   int64             `yaml:"Created"`                         // Unix timestamp when created
-	Consumed  bool              `yaml:"consumed,omitempty"`              // For sequential replay (internal use)
+	Consumed  bool              `yaml:"consumed,omitempty"`              // For sequential mode (internal use)
 	SortOrder int               `yaml:"sort_order,omitempty"`            // Order consumed (internal use)
 
 	// Timestamps for timing-sensitive tests (using Go's time format)
@@ -99,7 +99,7 @@ type ResponseSpec struct {
 	LastInsertID int64 `yaml:"LastInsertID,omitempty"` // Auto-increment ID from INSERT
 	RowsAffected int64 `yaml:"RowsAffected,omitempty"` // Number of rows affected
 
-	// For errors (records error responses for testing error handling)
+	// For errors (stores error responses for error handling)
 	Error     string `yaml:"Error,omitempty"`     // Error message if query failed
 	ErrorCode int    `yaml:"ErrorCode,omitempty"` // MySQL error code (if applicable)
 
@@ -249,7 +249,7 @@ func (s *MockStore) Add(mock *Mock) error {
 	return nil
 }
 
-// FindMatch finds a matching mock for a request (sequential replay support)
+// FindMatch finds a matching cache entry for a request (sequential mode support)
 // This implements AST-based matching algorithm for SQL queries
 func (s *MockStore) FindMatch(query, queryType, structure string, args []interface{}, consumeOnMatch bool) (*Mock, bool) {
 	s.mu.Lock()
@@ -262,7 +262,7 @@ func (s *MockStore) FindMatch(query, queryType, structure string, args []interfa
 	var definitiveMatch bool
 
 	for _, mock := range s.mocks {
-		// Skip already consumed mocks in sequential replay
+		// Skip already consumed entries in sequential mode
 		if consumeOnMatch && mock.Spec.Consumed {
 			continue
 		}
@@ -293,7 +293,7 @@ func (s *MockStore) FindMatch(query, queryType, structure string, args []interfa
 		return nil, false
 	}
 
-	// Mark as consumed for sequential replay
+	// Mark as consumed for sequential mode
 	if consumeOnMatch {
 		bestMatch.Spec.Consumed = true
 		s.sortOrder++
@@ -583,7 +583,7 @@ func (s *MockStore) generateKey(mock *Mock) string {
 	return fmt.Sprintf("%s|%s|%s", mock.Spec.Request.Query, mock.Spec.Request.Structure, mock.Name)
 }
 
-// Save saves all mocks to YAML files (one combined mocks.yaml file)
+// Save saves all cache entries to YAML files (one combined mocks.yaml file)
 // Uses atomic writes for production safety - writes to temp file then renames
 func (s *MockStore) Save() error {
 	s.mu.RLock()
@@ -606,7 +606,7 @@ func (s *MockStore) Save() error {
 	for i, mock := range s.mocks {
 		mockData, err := yaml.Marshal(mock)
 		if err != nil {
-			return fmt.Errorf("failed to marshal mock %s: %w", mock.Name, err)
+			return fmt.Errorf("failed to marshal cache entry %s: %w", mock.Name, err)
 		}
 
 		if i > 0 {
@@ -632,7 +632,7 @@ func (s *MockStore) Save() error {
 	return nil
 }
 
-// Load loads mocks from YAML files
+// Load loads cache entries from YAML files
 func (s *MockStore) Load() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -870,7 +870,7 @@ func (s *MockStore) isExpired(mock *Mock) bool {
 	return time.Now().Unix()-mock.Spec.Created > s.ttl
 }
 
-// Reset resets consumed state for all mocks (for re-replay)
+// Reset resets consumed state for all entries (for sequential re-use)
 func (s *MockStore) Reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

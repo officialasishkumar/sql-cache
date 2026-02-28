@@ -1,29 +1,29 @@
-// Example: Unit testing with sql-cache
-// This shows how to use sql-cache for unit tests without a database.
+// Example: Using sql-cache in a service
+// This shows how to use sql-cache for services without a database.
 package main
 
 import (
 	"fmt"
 	"log"
 
-	sqlcache "github.com/asish/sql-cache"
-	"github.com/asish/sql-cache/wrapper"
+	sqlcache "github.com/officialasishkumar/sql-cache"
+	"github.com/officialasishkumar/sql-cache/wrapper"
 )
 
 func main() {
-	fmt.Println("=== Unit Testing Example ===")
+	fmt.Println("=== Service Cache Example ===")
 
-	// Test 1: Test with mocked data
-	fmt.Println("Test 1: User Service with Mocked Database")
+	// Example 1: Service with cached data
+	fmt.Println("Example 1: User Service with Cached Database")
 	testUserService()
 
-	// Test 2: Test error handling
-	fmt.Println("\nTest 2: Error Handling")
+	// Example 2: Error handling
+	fmt.Println("\nExample 2: Error Handling")
 	testErrorHandling()
 
-	// Test 3: Test sequential replay
-	fmt.Println("\nTest 3: Sequential Replay")
-	testSequentialReplay()
+	// Example 3: Sequential consumption
+	fmt.Println("\nExample 3: Sequential Consumption")
+	testSequentialConsumption()
 }
 
 // =============================================================================
@@ -80,25 +80,25 @@ func (s *UserService) CreateUser(name, email string) (int64, error) {
 // =============================================================================
 
 func testUserService() {
-	// Create a mock database (no real DB needed!)
-	db, err := wrapper.NewReplayOnly(wrapper.Options{
-		MockDir:          "./test-mocks/user-service",
-		SequentialReplay: false, // Allow reusing mocks
+	// Create a cached database (no real DB needed!)
+	db, err := wrapper.NewCachedOnly(wrapper.Options{
+		MockDir:        "./test-mocks/user-service",
+		SequentialMode: false, // Allow reusing cache entries
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
-	// Setup mock data
-	db.Record(
+	// Setup cache data
+	db.Capture(
 		"SELECT id, name, email FROM users WHERE id = ?",
 		[]string{"id", "name", "email"},
 		[][]interface{}{{1, "Alice", "alice@example.com"}},
 		1,
 	)
 
-	db.Record(
+	db.Capture(
 		"SELECT id, name, email FROM users",
 		[]string{"id", "name", "email"},
 		[][]interface{}{
@@ -107,14 +107,14 @@ func testUserService() {
 		},
 	)
 
-	db.RecordExec(
+	db.CaptureExec(
 		"INSERT INTO users (name, email) VALUES (?, ?)",
 		3,  // lastInsertID
 		1,  // rowsAffected
 		"Charlie", "charlie@example.com",
 	)
 
-	// Create service with mock DB
+	// Create service with cached DB
 	service := &UserService{db: db}
 
 	// Test GetUser
@@ -157,15 +157,15 @@ func testErrorHandling() {
 	}
 	defer cache.Close()
 
-	// Record an error response
-	cache.RecordError(
+	// Capture an error response
+	cache.CaptureError(
 		"SELECT * FROM nonexistent",
 		"table not found: nonexistent",
 	)
 
-	cache.SetMode(sqlcache.ModeReplay)
+	cache.SetMode(sqlcache.ModeCached)
 
-	// Query should return the recorded error
+	// Query should return the cached error
 	_, err = cache.Query("SELECT * FROM nonexistent")
 	if err != nil && err.Error() == "table not found: nonexistent" {
 		fmt.Printf("  PASS: Got expected error: %v\n", err)
@@ -173,7 +173,7 @@ func testErrorHandling() {
 		fmt.Printf("  FAIL: Unexpected result: %v\n", err)
 	}
 
-	// Query for unrecorded query should fail
+	// Query for uncached query should fail
 	_, err = cache.Query("SELECT * FROM another_table")
 	if err != nil {
 		fmt.Printf("  PASS: Got error for unknown query: %v\n", truncate(err.Error(), 40))
@@ -182,39 +182,39 @@ func testErrorHandling() {
 	}
 }
 
-func testSequentialReplay() {
+func testSequentialConsumption() {
 	cache, err := sqlcache.New(sqlcache.Options{
-		MockDir:          "./test-mocks/sequential",
-		SequentialReplay: true, // Each mock can only be used once
+		MockDir:        "./test-mocks/sequential",
+		SequentialMode: true, // Each cache entry can only be used once
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer cache.Close()
 
-	// Clear any existing mocks from previous runs
+	// Clear any existing entries from previous runs
 	cache.Clear()
 
-	// Record same query multiple times with different results
-	cache.Record(
+	// Capture same query multiple times with different results
+	cache.Capture(
 		"SELECT value FROM counter",
 		[]string{"value"},
 		[][]interface{}{{1}},
 	)
-	cache.Record(
+	cache.Capture(
 		"SELECT value FROM counter",
 		[]string{"value"},
 		[][]interface{}{{2}},
 	)
-	cache.Record(
+	cache.Capture(
 		"SELECT value FROM counter",
 		[]string{"value"},
 		[][]interface{}{{3}},
 	)
 
-	cache.SetMode(sqlcache.ModeReplay)
+	cache.SetMode(sqlcache.ModeCached)
 
-	// Each query consumes the next mock in sequence
+	// Each query consumes the next entry in sequence
 	for i := 1; i <= 3; i++ {
 		rows, err := cache.Query("SELECT value FROM counter")
 		if err != nil {
@@ -232,10 +232,10 @@ func testSequentialReplay() {
 		}
 	}
 
-	// Fourth query should fail (no more mocks)
+	// Fourth query should fail (no more entries)
 	_, err = cache.Query("SELECT value FROM counter")
 	if err != nil {
-		fmt.Printf("  PASS: Fourth query correctly failed (mocks exhausted)\n")
+		fmt.Printf("  PASS: Fourth query correctly failed (cache entries exhausted)\n")
 	} else {
 		fmt.Printf("  FAIL: Fourth query should have failed\n")
 	}

@@ -4,7 +4,7 @@
 # - AST structure-based matching (uses vitess sqlparser)
 # - Placeholder count verification for prepared statements
 # - DML type checking (SELECT vs INSERT/UPDATE/DELETE)
-# - Sequential replay support with consumption tracking
+# - Sequential consumption support with entry tracking
 # - Type-flexible argument matching
 
 ---
@@ -271,7 +271,7 @@ spec:
     created: 1772272808
 
 ---
-# Sequential replay example - same query, different results
+# Sequential consumption example - same query, different results
 # In sequential mode, these will be returned in order
 version: sql-cache-v1
 kind: SQL

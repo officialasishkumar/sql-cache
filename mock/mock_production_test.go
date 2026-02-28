@@ -179,8 +179,8 @@ func TestDMLTypeChecking(t *testing.T) {
 	}
 }
 
-// TestSequentialReplay verifies sequential mock consumption
-func TestSequentialReplay(t *testing.T) {
+// TestSequentialConsumption verifies sequential cache entry consumption
+func TestSequentialConsumption(t *testing.T) {
 	store := NewMockStore("")
 
 	// Add same query structure but different args/responses

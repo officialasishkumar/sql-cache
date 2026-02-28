@@ -1,5 +1,5 @@
-// Example: Integration test with sql-cache
-// This shows how to use sql-cache in integration tests.
+// Example: Integration usage with sql-cache
+// This shows how to use sql-cache in integrated applications.
 package main
 
 import (
@@ -8,35 +8,35 @@ import (
 	"log"
 	"os"
 
-	sqlcache "github.com/asish/sql-cache"
-	"github.com/asish/sql-cache/wrapper"
+	sqlcache "github.com/officialasishkumar/sql-cache"
+	"github.com/officialasishkumar/sql-cache/wrapper"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
-	fmt.Println("=== Integration Test Example ===")
+	fmt.Println("=== Integration Example ===")
 
-	// Check if we should record or replay
+	// Check if we should capture or use cache
 	mode := os.Getenv("SQL_CACHE_MODE")
 	if mode == "" {
-		mode = "record"
+		mode = "capture"
 	}
 
 	fmt.Printf("Mode: %s\n\n", mode)
 
 	switch mode {
-	case "record":
-		runRecordMode()
-	case "replay":
-		runReplayMode()
+	case "capture":
+		runCaptureMode()
+	case "cached":
+		runCachedMode()
 	default:
 		log.Fatalf("Unknown mode: %s", mode)
 	}
 }
 
-func runRecordMode() {
-	fmt.Println("Running in RECORD mode - executing against real database")
+func runCaptureMode() {
+	fmt.Println("Running in CAPTURE mode - executing against real database")
 
 	// Real database connection
 	db, err := sql.Open("sqlite3", ":memory:")
@@ -50,11 +50,11 @@ func runRecordMode() {
 
 	// Wrap with caching
 	cachedDB, err := wrapper.Wrap(db, wrapper.Options{
-		MockDir:          "./test-mocks",
-		InitialMode:      sqlcache.ModeRecord,
-		SequentialReplay: true,
-		OnRecord: func(query string, args []interface{}) {
-			fmt.Printf("  Recording: %s\n", truncate(query, 60))
+		MockDir:        "./test-mocks",
+		InitialMode:    sqlcache.ModeCapture,
+		SequentialMode: true,
+		OnCapture: func(query string, args []interface{}) {
+			fmt.Printf("  Capturing: %s\n", truncate(query, 60))
 		},
 	})
 	if err != nil {
@@ -65,18 +65,18 @@ func runRecordMode() {
 	// Run business logic
 	runBusinessLogic(cachedDB)
 
-	fmt.Println("\nMocks saved to ./test-mocks/mocks.yaml")
-	fmt.Println("Run with SQL_CACHE_MODE=replay to use recorded mocks")
+	fmt.Println("\nCache entries saved to ./test-mocks/mocks.yaml")
+	fmt.Println("Run with SQL_CACHE_MODE=cached to use cached responses")
 }
 
-func runReplayMode() {
-	fmt.Println("Running in REPLAY mode - using recorded mocks (no database)")
+func runCachedMode() {
+	fmt.Println("Running in CACHED mode - using cached responses (no database)")
 
-	// Create replay-only wrapper
-	cachedDB, err := wrapper.NewReplayOnly(wrapper.Options{
-		MockDir:          "./test-mocks",
-		SequentialReplay: true,
-		OnReplay: func(query string, args []interface{}, matched bool) {
+	// Create cached-only wrapper
+	cachedDB, err := wrapper.NewCachedOnly(wrapper.Options{
+		MockDir:        "./test-mocks",
+		SequentialMode: true,
+		OnCacheHit: func(query string, args []interface{}, matched bool) {
 			status := "✓"
 			if !matched {
 				status = "✗"
@@ -94,7 +94,7 @@ func runReplayMode() {
 
 	// Print stats
 	stats := cachedDB.Stats()
-	fmt.Printf("\nReplay Stats: hits=%d, misses=%d, hit_rate=%.1f%%\n",
+	fmt.Printf("\nCache Stats: hits=%d, misses=%d, hit_rate=%.1f%%\n",
 		stats.Hits, stats.Misses, stats.HitRate*100)
 }
 
