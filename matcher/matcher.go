@@ -11,11 +11,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/officialasishkumar/sql-cache/internal/sqlmeta"
 	"vitess.io/vitess/go/vt/sqlparser"
 )
-
-// querySigCache caches query structures to avoid repeated parsing
-var querySigCache sync.Map // map[string]string
 
 // MatchResult contains the result of matching two queries
 type MatchResult struct {
@@ -107,26 +105,14 @@ func (m *Matcher) Match(expected, actual string) MatchResult {
 	}
 
 	// Count placeholders - must match for prepared statements
-	expectedPlaceholders := strings.Count(expected, "?")
-	actualPlaceholders := strings.Count(actual, "?")
+	expectedPlaceholders := sqlmeta.CountPlaceholders(expected)
+	actualPlaceholders := sqlmeta.CountPlaceholders(actual)
 	if expectedPlaceholders != actualPlaceholders {
 		return MatchResult{
 			Matched:   false,
 			Score:     0,
 			MatchType: NoMatch,
 			Reason:    "placeholder count mismatch",
-		}
-	}
-
-	// Check if both are DML or both are not DML
-	expectedIsDML := sqlparser.IsDML(expected)
-	actualIsDML := sqlparser.IsDML(actual)
-	if expectedIsDML != actualIsDML {
-		return MatchResult{
-			Matched:   false,
-			Score:     0,
-			MatchType: NoMatch,
-			Reason:    "DML type mismatch",
 		}
 	}
 
@@ -150,7 +136,7 @@ func (m *Matcher) Match(expected, actual string) MatchResult {
 			Matched:   true,
 			Score:     80,
 			MatchType: StructuralMatch,
-			Reason:    "AST structure match",
+			Reason:    "canonical query match",
 		}
 	}
 
@@ -352,51 +338,41 @@ func (m *Matcher) getStructureCached(sql string) (string, error) {
 	return sig, nil
 }
 
-// getQueryStructure creates a structural signature by walking the AST
-// This creates a unique signature based on the Go types of AST nodes
+// getQueryStructure returns a canonical SQL fingerprint.
 func (m *Matcher) getQueryStructure(sql string) (string, error) {
-	stmt, err := m.parser.Parse(sql)
-	if err != nil {
-		return "", err
-	}
-
-	var structureParts []string
-	err = sqlparser.Walk(func(node sqlparser.SQLNode) (bool, error) {
-		structureParts = append(structureParts, reflect.TypeOf(node).String())
-		return true, nil
-	}, stmt)
-
-	if err != nil {
-		return "", err
-	}
-
-	return strings.Join(structureParts, "->"), nil
+	return sqlmeta.Fingerprint(m.parser, sql)
 }
 
 // getStatementType returns the SQL statement type
 func (m *Matcher) getStatementType(sql string) string {
 	stmt, err := m.parser.Parse(sql)
 	if err != nil {
-		return ""
+		return sqlmeta.DetectQueryType(sql)
 	}
 
-	switch stmt.(type) {
-	case *sqlparser.Select:
-		return "SELECT"
-	case *sqlparser.Insert:
-		return "INSERT"
-	case *sqlparser.Update:
-		return "UPDATE"
-	case *sqlparser.Delete:
-		return "DELETE"
-	default:
-		return "OTHER"
+	if stmtType := sqlmeta.StatementType(stmt); stmtType != "OTHER" {
+		return stmtType
 	}
+	return sqlmeta.DetectQueryType(sql)
 }
 
-// GetStructure returns the AST structure of a query (for external use)
+// GetStructure returns the canonical query fingerprint.
 func (m *Matcher) GetStructure(sql string) (string, error) {
 	return m.getStructureCached(sql)
+}
+
+// GetTables returns the tables referenced by the query.
+func (m *Matcher) GetTables(sql string) []string {
+	stmt, err := m.parser.Parse(sql)
+	if err != nil {
+		return nil
+	}
+	return sqlmeta.ExtractTables(stmt)
+}
+
+// GetType returns the normalized SQL statement type.
+func (m *Matcher) GetType(sql string) string {
+	return m.getStatementType(sql)
 }
 
 // IsDML checks if the query is a DML statement

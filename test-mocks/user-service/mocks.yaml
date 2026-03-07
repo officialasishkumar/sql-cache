@@ -2,65 +2,288 @@ version: sql-cache-v1
 kind: SQL
 name: mock-1772270537668863000
 spec:
-    metadata:
-        recorded_at: "2026-02-28T14:52:17+05:30"
-    request:
-        query: SELECT id, name, email FROM users WHERE id = ?
-        args:
-            - 1
-        type: SELECT
-        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.Where->*sqlparser.ComparisonExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Argument'
-    response:
-        columns:
-            - id
-            - name
-            - email
-        rows:
-            - - 1
-              - Alice
-              - alice@example.com
-    created: 1772270537
+    Request:
+        Query: ""
+        Type: ""
+    Response: {}
+    Created: 0
 
 ---
 version: sql-cache-v1
 kind: SQL
 name: mock-1772270537668930000
 spec:
-    metadata:
-        recorded_at: "2026-02-28T14:52:17+05:30"
-    request:
-        query: SELECT id, name, email FROM users
-        type: SELECT
-        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI'
-    response:
-        columns:
-            - id
-            - name
-            - email
-        rows:
-            - - 1
-              - Alice
-              - alice@example.com
-            - - 2
-              - Bob
-              - bob@example.com
-    created: 1772270537
+    Request:
+        Query: ""
+        Type: ""
+    Response: {}
+    Created: 0
 
 ---
 version: sql-cache-v1
 kind: SQL
 name: mock-1772270537668987000
 spec:
-    metadata:
-        recorded_at: "2026-02-28T14:52:17+05:30"
-    request:
-        query: INSERT INTO users (name, email) VALUES (?, ?)
-        args:
+    Request:
+        Query: ""
+        Type: ""
+    Response: {}
+    Created: 0
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772911630303976000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T00:57:10+05:30"
+    Request:
+        Query: SELECT id, name, email FROM users WHERE id = ?
+        Args:
+            - 1
+        Type: SELECT
+        Structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.Where->*sqlparser.ComparisonExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Argument'
+        PlaceholderCount: 1
+        QueryHash: 0285ae1b83dc1e20
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+        Rows:
+            - - 1
+              - Alice
+              - alice@example.com
+        RowCount: 1
+    Created: 1772911630
+    ReqTimestampMock: 2026-03-08T00:57:10.303976+05:30
+    ResTimestampMock: 2026-03-08T00:57:10.303976+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772911630304050000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T00:57:10+05:30"
+    Request:
+        Query: SELECT id, name, email FROM users
+        Type: SELECT
+        Structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI'
+        QueryHash: 68073fb4815dab30
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+        Rows:
+            - - 1
+              - Alice
+              - alice@example.com
+            - - 2
+              - Bob
+              - bob@example.com
+        RowCount: 2
+    Created: 1772911630
+    ReqTimestampMock: 2026-03-08T00:57:10.30405+05:30
+    ResTimestampMock: 2026-03-08T00:57:10.30405+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772911630304103000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T00:57:10+05:30"
+    Request:
+        Query: INSERT INTO users (name, email) VALUES (?, ?)
+        Args:
             - Charlie
             - charlie@example.com
-        type: INSERT
-        structure: '*sqlparser.Insert->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.Columns->sqlparser.IdentifierCI->sqlparser.IdentifierCI->sqlparser.Values->sqlparser.ValTuple->*sqlparser.Argument->*sqlparser.Argument'
-    response:
-        last_insert_id: 3
-        rows_affected: 1
-    created: 1772270537
+        Type: INSERT
+        Structure: '*sqlparser.Insert->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.Columns->sqlparser.IdentifierCI->sqlparser.IdentifierCI->sqlparser.Values->sqlparser.ValTuple->*sqlparser.Argument->*sqlparser.Argument'
+        PlaceholderCount: 2
+        IsDML: true
+        QueryHash: 9e29eddaf470ec64
+    Response:
+        LastInsertID: 3
+        RowsAffected: 1
+    Created: 1772911630
+    ReqTimestampMock: 2026-03-08T00:57:10.304103+05:30
+    ResTimestampMock: 2026-03-08T00:57:10.304103+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772912471283197000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:11:11+05:30"
+    Request:
+        Query: SELECT id, name, email FROM users WHERE id = ?
+        Args:
+            - 1
+        Type: SELECT
+        Tables:
+            - users
+        Structure: SELECT `id`, `name`, `email` FROM `users` WHERE `id` = :v1
+        PlaceholderCount: 1
+        QueryHash: 0285ae1b83dc1e20
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+        Rows:
+            - - 1
+              - Alice
+              - alice@example.com
+        RowCount: 1
+    Created: 1772912471
+    ReqTimestampMock: 2026-03-08T01:11:11.283197+05:30
+    ResTimestampMock: 2026-03-08T01:11:11.283197+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772912471283221000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:11:11+05:30"
+    Request:
+        Query: SELECT id, name, email FROM users
+        Type: SELECT
+        Tables:
+            - users
+        Structure: SELECT `id`, `name`, `email` FROM `users`
+        QueryHash: 68073fb4815dab30
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+        Rows:
+            - - 1
+              - Alice
+              - alice@example.com
+            - - 2
+              - Bob
+              - bob@example.com
+        RowCount: 2
+    Created: 1772912471
+    ReqTimestampMock: 2026-03-08T01:11:11.283221+05:30
+    ResTimestampMock: 2026-03-08T01:11:11.283221+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772912471283316000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:11:11+05:30"
+    Request:
+        Query: INSERT INTO users (name, email) VALUES (?, ?)
+        Args:
+            - Charlie
+            - charlie@example.com
+        Type: INSERT
+        Tables:
+            - users
+        Structure: INSERT INTO `users`(`name`, `email`) VALUES (:v1, :v2)
+        PlaceholderCount: 2
+        IsDML: true
+        QueryHash: 9e29eddaf470ec64
+    Response:
+        LastInsertID: 3
+        RowsAffected: 1
+    Created: 1772912471
+    ReqTimestampMock: 2026-03-08T01:11:11.283316+05:30
+    ResTimestampMock: 2026-03-08T01:11:11.283316+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772913416039778000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:26:56+05:30"
+    Request:
+        Query: SELECT id, name, email FROM users WHERE id = ?
+        Args:
+            - 1
+        Type: SELECT
+        Tables:
+            - users
+        Structure: SELECT `id`, `name`, `email` FROM `users` WHERE `id` = :v1
+        PlaceholderCount: 1
+        QueryHash: 0285ae1b83dc1e20
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+        Rows:
+            - - 1
+              - Alice
+              - alice@example.com
+        RowCount: 1
+    Created: 1772913416
+    ReqTimestampMock: 2026-03-08T01:26:56.039778+05:30
+    ResTimestampMock: 2026-03-08T01:26:56.039778+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772913416039849000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:26:56+05:30"
+    Request:
+        Query: SELECT id, name, email FROM users
+        Type: SELECT
+        Tables:
+            - users
+        Structure: SELECT `id`, `name`, `email` FROM `users`
+        QueryHash: 68073fb4815dab30
+    Response:
+        Columns:
+            - id
+            - name
+            - email
+        Rows:
+            - - 1
+              - Alice
+              - alice@example.com
+            - - 2
+              - Bob
+              - bob@example.com
+        RowCount: 2
+    Created: 1772913416
+    ReqTimestampMock: 2026-03-08T01:26:56.039849+05:30
+    ResTimestampMock: 2026-03-08T01:26:56.039849+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772913416040003000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:26:56+05:30"
+    Request:
+        Query: INSERT INTO users (name, email) VALUES (?, ?)
+        Args:
+            - Charlie
+            - charlie@example.com
+        Type: INSERT
+        Tables:
+            - users
+        Structure: INSERT INTO `users`(`name`, `email`) VALUES (:v1, :v2)
+        PlaceholderCount: 2
+        IsDML: true
+        QueryHash: 9e29eddaf470ec64
+    Response:
+        LastInsertID: 3
+        RowsAffected: 1
+    Created: 1772913416
+    ReqTimestampMock: 2026-03-08T01:26:56.040003+05:30
+    ResTimestampMock: 2026-03-08T01:26:56.040003+05:30

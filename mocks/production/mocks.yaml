@@ -13,7 +13,7 @@
 # 6. Type-flexible argument matching (int/int64/float64 interop)
 #
 # Usage:
-#   cache.SetMode(sqlcache.ModeCached)
+#   cache.SetMode(sqlcache.ModeOffline)
 #   rows, _ := cache.Query("SELECT * FROM users WHERE id = ?", 1)
 #
 # The matching algorithm will:
@@ -30,7 +30,7 @@ kind: SQL
 name: mock-select-user-by-id
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:00+05:30"
+        cached_at: "2026-02-28T15:00:00+05:30"
         operation: "query"
         description: "Fetch user by ID - demonstrates basic SELECT with single placeholder"
     Request:
@@ -67,7 +67,7 @@ kind: SQL
 name: mock-select-user-by-name-and-status
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:01+05:30"
+        cached_at: "2026-02-28T15:00:01+05:30"
         operation: "query"
         description: "Fetch users by name pattern and status - demonstrates LIKE and multiple conditions"
     Request:
@@ -103,7 +103,7 @@ kind: SQL
 name: mock-select-all-users
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:02+05:30"
+        cached_at: "2026-02-28T15:00:02+05:30"
         operation: "query"
         description: "Fetch all users - demonstrates query without placeholders"
     Request:
@@ -140,7 +140,7 @@ kind: SQL
 name: mock-select-users-with-orders
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:03+05:30"
+        cached_at: "2026-02-28T15:00:03+05:30"
         operation: "query"
         description: "Fetch users with their orders - demonstrates JOIN query"
     Request:
@@ -179,7 +179,7 @@ kind: SQL
 name: mock-count-active-users
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:04+05:30"
+        cached_at: "2026-02-28T15:00:04+05:30"
         operation: "query"
         description: "Count active users - demonstrates COUNT(*) aggregate"
     Request:
@@ -207,7 +207,7 @@ kind: SQL
 name: mock-user-order-summary
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:05+05:30"
+        cached_at: "2026-02-28T15:00:05+05:30"
         operation: "query"
         description: "User order summary - demonstrates GROUP BY with HAVING clause"
     Request:
@@ -242,7 +242,7 @@ kind: SQL
 name: mock-insert-user
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:06+05:30"
+        cached_at: "2026-02-28T15:00:06+05:30"
         operation: "exec"
         description: "Insert new user - demonstrates basic INSERT"
     Request:
@@ -269,7 +269,7 @@ kind: SQL
 name: mock-upsert-user
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:07+05:30"
+        cached_at: "2026-02-28T15:00:07+05:30"
         operation: "exec"
         description: "Upsert user - demonstrates INSERT ON DUPLICATE KEY UPDATE"
     Request:
@@ -296,7 +296,7 @@ kind: SQL
 name: mock-update-user-email
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:08+05:30"
+        cached_at: "2026-02-28T15:00:08+05:30"
         operation: "exec"
         description: "Update user email - demonstrates basic UPDATE"
     Request:
@@ -321,7 +321,7 @@ kind: SQL
 name: mock-update-user-status-batch
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:09+05:30"
+        cached_at: "2026-02-28T15:00:09+05:30"
         operation: "exec"
         description: "Batch update user status - demonstrates UPDATE affecting multiple rows"
     Request:
@@ -347,7 +347,7 @@ kind: SQL
 name: mock-delete-user
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:10+05:30"
+        cached_at: "2026-02-28T15:00:10+05:30"
         operation: "exec"
         description: "Delete user by ID - demonstrates basic DELETE"
     Request:
@@ -371,7 +371,7 @@ kind: SQL
 name: mock-delete-users-batch
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:11+05:30"
+        cached_at: "2026-02-28T15:00:11+05:30"
         operation: "exec"
         description: "Delete multiple users - demonstrates DELETE with IN clause"
     Request:
@@ -397,7 +397,7 @@ kind: SQL
 name: mock-select-users-with-orders-subquery
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:12+05:30"
+        cached_at: "2026-02-28T15:00:12+05:30"
         operation: "query"
         description: "Users with orders - demonstrates subquery"
     Request:
@@ -439,7 +439,7 @@ kind: SQL
 name: mock-select-user-not-found
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:13+05:30"
+        cached_at: "2026-02-28T15:00:13+05:30"
         operation: "query"
         description: "User not found - demonstrates empty result set"
     Request:
@@ -470,7 +470,7 @@ kind: SQL
 name: mock-duplicate-key-error
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:14+05:30"
+        cached_at: "2026-02-28T15:00:14+05:30"
         operation: "exec"
         description: "Duplicate key error - demonstrates error response"
     Request:
@@ -497,7 +497,7 @@ kind: SQL
 name: mock-select-users-paginated
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:15+05:30"
+        cached_at: "2026-02-28T15:00:15+05:30"
         operation: "query"
         description: "Paginated user list - demonstrates ORDER BY and LIMIT"
     Request:
@@ -537,7 +537,7 @@ kind: SQL
 name: mock-select-with-null
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:16+05:30"
+        cached_at: "2026-02-28T15:00:16+05:30"
         operation: "query"
         description: "Query with NULL values - demonstrates NULL handling"
     Request:
@@ -575,7 +575,7 @@ kind: SQL
 name: mock-select-various-types
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:17+05:30"
+        cached_at: "2026-02-28T15:00:17+05:30"
         operation: "query"
         description: "Query with various data types - demonstrates type preservation"
     Request:
@@ -614,7 +614,7 @@ kind: SQL
 name: mock-prepared-select-user-arg-1
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:18+05:30"
+        cached_at: "2026-02-28T15:00:18+05:30"
         operation: "query"
         description: "Prepared statement execution with arg 1 - first call in sequence"
     Request:
@@ -646,7 +646,7 @@ kind: SQL
 name: mock-prepared-select-user-arg-2
 spec:
     Metadata:
-        recorded_at: "2026-02-28T15:00:19+05:30"
+        cached_at: "2026-02-28T15:00:19+05:30"
         operation: "query"
         description: "Prepared statement execution with arg 2 - second call in sequence"
     Request:

@@ -1,58 +1,76 @@
-version: sql-cache-v1
+version: sql-cache/v1
 kind: SQL
-name: mock-1772270537669598000
+name: mock-1772913416043982000
 spec:
-    metadata:
-        recorded_at: "2026-02-28T14:52:17+05:30"
-    request:
-        query: SELECT value FROM counter
-        type: SELECT
-        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI'
-    response:
-        columns:
+    Metadata:
+        captured_at: "2026-03-08T01:26:56+05:30"
+    Request:
+        Query: SELECT value FROM counter
+        Type: SELECT
+        Tables:
+            - counter
+        Structure: SELECT `value` FROM `counter`
+        QueryHash: 80142b358c6b61ce
+    Response:
+        Columns:
             - value
-        rows:
+        Rows:
             - - 1
-    created: 1772270537
+        RowCount: 1
+    Created: 1772913416
     consumed: true
     sort_order: 1
+    ReqTimestampMock: 2026-03-08T01:26:56.043982+05:30
+    ResTimestampMock: 2026-03-08T01:26:56.043982+05:30
 
 ---
-version: sql-cache-v1
+version: sql-cache/v1
 kind: SQL
-name: mock-1772270537669599000
+name: mock-1772913416043987000
 spec:
-    metadata:
-        recorded_at: "2026-02-28T14:52:17+05:30"
-    request:
-        query: SELECT value FROM counter
-        type: SELECT
-        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI'
-    response:
-        columns:
+    Metadata:
+        captured_at: "2026-03-08T01:26:56+05:30"
+    Request:
+        Query: SELECT value FROM counter
+        Type: SELECT
+        Tables:
+            - counter
+        Structure: SELECT `value` FROM `counter`
+        QueryHash: 80142b358c6b61ce
+    Response:
+        Columns:
             - value
-        rows:
+        Rows:
             - - 2
-    created: 1772270537
+        RowCount: 1
+    Created: 1772913416
     consumed: true
     sort_order: 2
+    ReqTimestampMock: 2026-03-08T01:26:56.043987+05:30
+    ResTimestampMock: 2026-03-08T01:26:56.043987+05:30
 
 ---
-version: sql-cache-v1
+version: sql-cache/v1
 kind: SQL
-name: mock-1772270537669600000
+name: mock-1772913416043991000
 spec:
-    metadata:
-        recorded_at: "2026-02-28T14:52:17+05:30"
-    request:
-        query: SELECT value FROM counter
-        type: SELECT
-        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI'
-    response:
-        columns:
+    Metadata:
+        captured_at: "2026-03-08T01:26:56+05:30"
+    Request:
+        Query: SELECT value FROM counter
+        Type: SELECT
+        Tables:
+            - counter
+        Structure: SELECT `value` FROM `counter`
+        QueryHash: 80142b358c6b61ce
+    Response:
+        Columns:
             - value
-        rows:
+        Rows:
             - - 3
-    created: 1772270537
+        RowCount: 1
+    Created: 1772913416
     consumed: true
     sort_order: 3
+    ReqTimestampMock: 2026-03-08T01:26:56.043991+05:30
+    ResTimestampMock: 2026-03-08T01:26:56.043991+05:30

@@ -9,10 +9,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"reflect"
 	"strings"
 	"sync"
 
+	"github.com/officialasishkumar/sql-cache/internal/sqlmeta"
 	"vitess.io/vitess/go/vt/sqlparser"
 )
 
@@ -37,7 +37,7 @@ func NewParser() (*Parser, error) {
 type QuerySignature struct {
 	// Original is the original SQL query
 	Original string
-	// Structure is the AST structure signature
+	// Structure is the canonical SQL fingerprint used for matching.
 	Structure string
 	// Hash is a unique hash of the signature for fast comparison
 	Hash string
@@ -58,31 +58,21 @@ func (p *Parser) Parse(sql string) (*QuerySignature, error) {
 		return cached.(*QuerySignature), nil
 	}
 
-	stmt, err := p.parser.Parse(sql)
+	meta, err := sqlmeta.Analyze(p.parser, sql)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse SQL: %w", err)
 	}
 
 	sig := &QuerySignature{
-		Original: sql,
-		IsDML:    sqlparser.IsDML(sql),
+		Original:  sql,
+		Structure: meta.Fingerprint,
+		Type:      meta.Type,
+		Tables:    meta.Tables,
+		IsDML:     meta.IsDML,
 	}
 
-	// Get statement type
-	sig.Type = getStatementType(stmt)
-
-	// Get tables from the query
-	sig.Tables = extractTables(stmt)
-
-	// Get structural signature by walking the AST
-	structure, err := getQueryStructure(stmt)
-	if err != nil {
-		return nil, err
-	}
-	sig.Structure = structure
-
-	// Create hash from original query + structure
-	sig.Hash = createHash(sql + "|" + sig.Structure)
+	// Create hash from the canonical query fingerprint.
+	sig.Hash = createHash(sig.Structure)
 
 	// Cache the result
 	p.signatureCache.Store(sql, sig)
@@ -108,11 +98,6 @@ func (p *Parser) Match(expected, actual *QuerySignature) (exact bool, structural
 		return false, true, 80
 	}
 
-	// Type and tables match
-	if expected.Type == actual.Type && tablesMatch(expected.Tables, actual.Tables) {
-		return false, true, 60
-	}
-
 	// Only type matches
 	if expected.Type == actual.Type {
 		return false, false, 30
@@ -126,95 +111,10 @@ func (p *Parser) IsDML(sql string) bool {
 	return sqlparser.IsDML(sql)
 }
 
-// getStatementType returns the type of SQL statement
-func getStatementType(stmt sqlparser.Statement) string {
-	switch stmt.(type) {
-	case *sqlparser.Select:
-		return "SELECT"
-	case *sqlparser.Insert:
-		return "INSERT"
-	case *sqlparser.Update:
-		return "UPDATE"
-	case *sqlparser.Delete:
-		return "DELETE"
-	case *sqlparser.CreateTable:
-		return "CREATE_TABLE"
-	case *sqlparser.AlterTable:
-		return "ALTER_TABLE"
-	case *sqlparser.DropTable:
-		return "DROP_TABLE"
-	case *sqlparser.CreateDatabase:
-		return "CREATE_DATABASE"
-	case *sqlparser.Begin:
-		return "BEGIN"
-	case *sqlparser.Commit:
-		return "COMMIT"
-	case *sqlparser.Rollback:
-		return "ROLLBACK"
-	default:
-		return "OTHER"
-	}
-}
-
-// extractTables extracts table names from a SQL statement
-func extractTables(stmt sqlparser.Statement) []string {
-	tables := make([]string, 0)
-	tableSet := make(map[string]bool)
-
-	_ = sqlparser.Walk(func(node sqlparser.SQLNode) (bool, error) {
-		switch n := node.(type) {
-		case sqlparser.TableName:
-			tableName := n.Name.String()
-			if tableName != "" && !tableSet[tableName] {
-				tableSet[tableName] = true
-				tables = append(tables, tableName)
-			}
-		}
-		return true, nil
-	}, stmt)
-
-	return tables
-}
-
-// getQueryStructure creates a structural signature by walking the AST
-// This creates a signature based on the Go types of AST nodes
-func getQueryStructure(stmt sqlparser.Statement) (string, error) {
-	var structureParts []string
-
-	// Walk the AST and collect the Go type of each grammatical node.
-	err := sqlparser.Walk(func(node sqlparser.SQLNode) (bool, error) {
-		structureParts = append(structureParts, reflect.TypeOf(node).String())
-		return true, nil
-	}, stmt)
-
-	if err != nil {
-		return "", fmt.Errorf("failed to walk AST: %w", err)
-	}
-
-	return strings.Join(structureParts, "->"), nil
-}
-
 // createHash creates a SHA256 hash of the input
 func createHash(input string) string {
 	hash := sha256.Sum256([]byte(input))
 	return hex.EncodeToString(hash[:])
-}
-
-// tablesMatch checks if two table lists match (order independent)
-func tablesMatch(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	aSet := make(map[string]bool)
-	for _, t := range a {
-		aSet[t] = true
-	}
-	for _, t := range b {
-		if !aSet[t] {
-			return false
-		}
-	}
-	return true
 }
 
 // GetQueryStructureCached returns the cached structure for a query

@@ -28,14 +28,14 @@ type CachedDriver struct {
 func WrapDriver(name string, d driver.Driver, cache *sqlcache.Cache) *CachedDriver {
 	mu.Lock()
 	defer mu.Unlock()
-	
+
 	wrapped := &CachedDriver{
 		underlying: d,
 		cache:      cache,
-		mode:       sqlcache.ModeCached,
+		mode:       sqlcache.ModeAuto,
 	}
 	wrappedDrivers[name] = wrapped
-	
+
 	return wrapped
 }
 
@@ -43,21 +43,21 @@ func WrapDriver(name string, d driver.Driver, cache *sqlcache.Cache) *CachedDriv
 func Register(name, underlyingDriver string, cache *sqlcache.Cache) error {
 	mu.Lock()
 	defer mu.Unlock()
-	
+
 	// Find the underlying driver
 	db, err := sql.Open(underlyingDriver, "")
 	if err != nil {
 		return fmt.Errorf("failed to get underlying driver: %w", err)
 	}
 	defer db.Close()
-	
+
 	wrapped := &CachedDriver{
 		underlying: db.Driver(),
 		cache:      cache,
-		mode:       sqlcache.ModeCached,
+		mode:       sqlcache.ModeAuto,
 	}
 	wrappedDrivers[name] = wrapped
-	
+
 	sql.Register(name, wrapped)
 	return nil
 }
@@ -68,7 +68,7 @@ func (d *CachedDriver) Open(dsn string) (driver.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &CachedConn{
 		underlying: conn,
 		cache:      d.cache,
@@ -95,7 +95,7 @@ func (c *CachedConn) Prepare(query string) (driver.Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &CachedStmt{
 		underlying: stmt,
 		query:      query,
@@ -114,66 +114,41 @@ func (c *CachedConn) Begin() (driver.Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &CachedTx{
 		underlying: tx,
 		conn:       c,
 	}, nil
 }
 
-// QueryContext implements driver.QueryerContext
+// QueryContext implements driver.QueryerContext.
+// Delegates to the cache which handles both ModeAuto and ModeOffline.
 func (c *CachedConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	// Convert args
 	plainArgs := make([]any, len(args))
 	for i, arg := range args {
 		plainArgs[i] = arg.Value
 	}
-	
-	mode := c.driver.mode
-	
-	switch mode {
-	case sqlcache.ModePassthrough:
-		if queryer, ok := c.underlying.(driver.QueryerContext); ok {
-			return queryer.QueryContext(ctx, query, args)
-		}
-		return nil, fmt.Errorf("underlying driver does not support QueryContext")
-		
-	case sqlcache.ModeCapture, sqlcache.ModeCached, sqlcache.ModeCacheFallback:
-		rows, err := c.cache.QueryContext(ctx, query, plainArgs...)
-		if err != nil {
-			return nil, err
-		}
-		return &CachedDriverRows{cached: rows}, nil
+
+	rows, err := c.cache.QueryContext(ctx, query, plainArgs...)
+	if err != nil {
+		return nil, err
 	}
-	
-	return nil, fmt.Errorf("unknown mode: %v", mode)
+	return &CachedDriverRows{cached: rows}, nil
 }
 
-// ExecContext implements driver.ExecerContext
+// ExecContext implements driver.ExecerContext.
+// Delegates to the cache which handles both ModeAuto and ModeOffline.
 func (c *CachedConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	plainArgs := make([]any, len(args))
 	for i, arg := range args {
 		plainArgs[i] = arg.Value
 	}
-	
-	mode := c.driver.mode
-	
-	switch mode {
-	case sqlcache.ModePassthrough:
-		if execer, ok := c.underlying.(driver.ExecerContext); ok {
-			return execer.ExecContext(ctx, query, args)
-		}
-		return nil, fmt.Errorf("underlying driver does not support ExecContext")
-		
-	case sqlcache.ModeCapture, sqlcache.ModeCached, sqlcache.ModeCacheFallback:
-		result, err := c.cache.ExecContext(ctx, query, plainArgs...)
-		if err != nil {
-			return nil, err
-		}
-		return &CachedDriverResult{cached: result}, nil
+
+	result, err := c.cache.ExecContext(ctx, query, plainArgs...)
+	if err != nil {
+		return nil, err
 	}
-	
-	return nil, fmt.Errorf("unknown mode: %v", mode)
+	return &CachedDriverResult{cached: result}, nil
 }
 
 // CachedStmt wraps a driver.Stmt with caching
@@ -199,12 +174,12 @@ func (s *CachedStmt) Exec(args []driver.Value) (driver.Result, error) {
 	for i, arg := range args {
 		plainArgs[i] = arg
 	}
-	
+
 	result, err := s.conn.cache.Exec(s.query, plainArgs...)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &CachedDriverResult{cached: result}, nil
 }
 
@@ -214,12 +189,12 @@ func (s *CachedStmt) Query(args []driver.Value) (driver.Rows, error) {
 	for i, arg := range args {
 		plainArgs[i] = arg
 	}
-	
+
 	rows, err := s.conn.cache.Query(s.query, plainArgs...)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &CachedDriverRows{cached: rows}, nil
 }
 
@@ -259,13 +234,12 @@ func (r *CachedDriverRows) Next(dest []driver.Value) error {
 	if !r.cached.Next() {
 		return fmt.Errorf("no more rows")
 	}
-	
-	// Scan into dest
+
 	dests := make([]interface{}, len(dest))
 	for i := range dest {
 		dests[i] = &dest[i]
 	}
-	
+
 	return r.cached.Scan(dests...)
 }
 

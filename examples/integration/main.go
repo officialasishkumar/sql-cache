@@ -1,5 +1,5 @@
 // Example: Integration usage with sql-cache
-// This shows how to use sql-cache in integrated applications.
+// This shows how sql-cache provides transparent caching in applications.
 package main
 
 import (
@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 
-	sqlcache "github.com/officialasishkumar/sql-cache"
 	"github.com/officialasishkumar/sql-cache/wrapper"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -17,26 +16,26 @@ import (
 func main() {
 	fmt.Println("=== Integration Example ===")
 
-	// Check if we should capture or use cache
+	// Check mode from environment
 	mode := os.Getenv("SQL_CACHE_MODE")
 	if mode == "" {
-		mode = "capture"
+		mode = "auto"
 	}
 
 	fmt.Printf("Mode: %s\n\n", mode)
 
 	switch mode {
-	case "capture":
-		runCaptureMode()
-	case "cached":
-		runCachedMode()
+	case "auto":
+		runAutoMode()
+	case "offline":
+		runOfflineMode()
 	default:
-		log.Fatalf("Unknown mode: %s", mode)
+		log.Fatalf("Unknown mode: %s (use 'auto' or 'offline')", mode)
 	}
 }
 
-func runCaptureMode() {
-	fmt.Println("Running in CAPTURE mode - executing against real database")
+func runAutoMode() {
+	fmt.Println("Running in AUTO mode - cache-through with real database")
 
 	// Real database connection
 	db, err := sql.Open("sqlite3", ":memory:")
@@ -48,13 +47,12 @@ func runCaptureMode() {
 	// Setup schema
 	setupDatabase(db)
 
-	// Wrap with caching
+	// Wrap with caching - ModeAuto is the default
 	cachedDB, err := wrapper.Wrap(db, wrapper.Options{
 		MockDir:        "./test-mocks",
-		InitialMode:    sqlcache.ModeCapture,
 		SequentialMode: true,
-		OnCapture: func(query string, args []interface{}) {
-			fmt.Printf("  Capturing: %s\n", truncate(query, 60))
+		OnCacheSave: func(query string, args []interface{}) {
+			fmt.Printf("  [SAVED] %s\n", truncate(query, 60))
 		},
 	})
 	if err != nil {
@@ -62,24 +60,25 @@ func runCaptureMode() {
 	}
 	defer cachedDB.Close()
 
-	// Run business logic
+	// Run business logic - first run hits DB and saves to cache
+	fmt.Println("\n--- First run (cache miss → calls DB → saves) ---")
 	runBusinessLogic(cachedDB)
 
 	fmt.Println("\nCache entries saved to ./test-mocks/mocks.yaml")
-	fmt.Println("Run with SQL_CACHE_MODE=cached to use cached responses")
+	fmt.Println("Run with SQL_CACHE_MODE=offline to use cached responses only")
 }
 
-func runCachedMode() {
-	fmt.Println("Running in CACHED mode - using cached responses (no database)")
+func runOfflineMode() {
+	fmt.Println("Running in OFFLINE mode - using cached responses (no database)")
 
-	// Create cached-only wrapper
-	cachedDB, err := wrapper.NewCachedOnly(wrapper.Options{
+	// Create offline wrapper - no database needed
+	cachedDB, err := wrapper.NewOffline(wrapper.Options{
 		MockDir:        "./test-mocks",
 		SequentialMode: true,
 		OnCacheHit: func(query string, args []interface{}, matched bool) {
-			status := "✓"
+			status := "HIT"
 			if !matched {
-				status = "✗"
+				status = "MISS"
 			}
 			fmt.Printf("  [%s] %s\n", status, truncate(query, 60))
 		},
@@ -89,7 +88,7 @@ func runCachedMode() {
 	}
 	defer cachedDB.Close()
 
-	// Run same business logic - but now without database!
+	// Run same business logic - served entirely from cache
 	runBusinessLogic(cachedDB)
 
 	// Print stats

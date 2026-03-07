@@ -2,24 +2,37 @@ version: sql-cache-v1
 kind: SQL
 name: mock-1772270429101386000
 spec:
-    metadata:
-        recorded_at: "2026-02-28T14:50:29+05:30"
-    request:
-        query: SELECT * FROM products WHERE category = ?
-        args:
-            - electronics
-        type: SELECT
-        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.StarExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Where->*sqlparser.ComparisonExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Argument'
-    response:
-        columns:
+    Request:
+        Query: ""
+        Type: ""
+    Response: {}
+    Created: 0
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772911630741883000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T00:57:10+05:30"
+    Request:
+        Query: SELECT id, name, price FROM products
+        Type: SELECT
+        Structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI'
+        QueryHash: d4f2ee5ab7134c4c
+    Response:
+        Columns:
             - id
             - name
             - price
-        rows:
+        Rows:
             - - 1
               - Widget
               - 9.99
             - - 2
               - Gadget
               - 19.99
-    created: 1772270429
+        RowCount: 2
+    Created: 1772911630
+    ReqTimestampMock: 2026-03-08T00:57:10.741883+05:30
+    ResTimestampMock: 2026-03-08T00:57:10.741883+05:30

@@ -2,12 +2,66 @@ version: sql-cache-v1
 kind: SQL
 name: mock-1772270537669442000
 spec:
-    metadata:
-        recorded_at: "2026-02-28T14:52:17+05:30"
-    request:
-        query: SELECT * FROM nonexistent
-        type: SELECT
-        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.StarExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS'
-    response:
-        error: 'table not found: nonexistent'
-    created: 1772270537
+    Request:
+        Query: ""
+        Type: ""
+    Response: {}
+    Created: 0
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772911630305261000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T00:57:10+05:30"
+    Request:
+        Query: SELECT * FROM nonexistent
+        Type: SELECT
+        Structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.StarExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS'
+        QueryHash: a1c6c219ced2ebd4
+    Response:
+        Error: 'table not found: nonexistent'
+    Created: 1772911630
+    ReqTimestampMock: 2026-03-08T00:57:10.305261+05:30
+    ResTimestampMock: 2026-03-08T00:57:10.305261+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772912471284922000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:11:11+05:30"
+    Request:
+        Query: SELECT * FROM nonexistent
+        Type: SELECT
+        Tables:
+            - nonexistent
+        Structure: SELECT * FROM `nonexistent`
+        QueryHash: a1c6c219ced2ebd4
+    Response:
+        Error: 'table not found: nonexistent'
+    Created: 1772912471
+    ReqTimestampMock: 2026-03-08T01:11:11.284922+05:30
+    ResTimestampMock: 2026-03-08T01:11:11.284922+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772913416042524000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:26:56+05:30"
+    Request:
+        Query: SELECT * FROM nonexistent
+        Type: SELECT
+        Tables:
+            - nonexistent
+        Structure: SELECT * FROM `nonexistent`
+        QueryHash: a1c6c219ced2ebd4
+    Response:
+        Error: 'table not found: nonexistent'
+    Created: 1772913416
+    ReqTimestampMock: 2026-03-08T01:26:56.042524+05:30
+    ResTimestampMock: 2026-03-08T01:26:56.042524+05:30

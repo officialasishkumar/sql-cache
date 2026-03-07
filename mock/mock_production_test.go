@@ -39,10 +39,10 @@ func TestExactQueryMatch(t *testing.T) {
 			wantMatch: true,
 		},
 		{
-			name:      "structural match with different args",
+			name:      "different args do not match",
 			query:     "SELECT id, name, email FROM users WHERE id = ?",
 			args:      []interface{}{2},
-			wantMatch: true, // Structural matching allows different args
+			wantMatch: false,
 		},
 		{
 			name:      "case different - should not match exactly",
@@ -65,6 +65,30 @@ func TestExactQueryMatch(t *testing.T) {
 				t.Errorf("FindMatch() = %v, want %v", found, tt.wantMatch)
 			}
 		})
+	}
+}
+
+func TestCanonicalQueryMatching(t *testing.T) {
+	store := NewMockStore("")
+
+	mock := CreateMock(
+		"SELECT * FROM users WHERE id = 1 AND status = 'active'",
+		nil,
+		[]string{"id", "name"},
+		[][]interface{}{{1, "Alice"}},
+		0, 0, "",
+	)
+	store.Add(mock)
+
+	_, found := store.FindMatch(
+		"select * from users where status = 'active' and id = 1",
+		"SELECT",
+		"",
+		nil,
+		false,
+	)
+	if !found {
+		t.Fatal("expected canonical query match")
 	}
 }
 
@@ -114,6 +138,41 @@ func TestPlaceholderMatching(t *testing.T) {
 				t.Errorf("FindMatch() = %v, want %v", found, tt.wantMatch)
 			}
 		})
+	}
+}
+
+func TestPostgresPlaceholderMatching(t *testing.T) {
+	store := NewMockStore("")
+
+	mock := CreateMock(
+		"SELECT * FROM users WHERE id = $1 AND status = $2",
+		[]interface{}{1, "active"},
+		[]string{"id", "name"},
+		[][]interface{}{{1, "Alice"}},
+		0, 0, "",
+	)
+	store.Add(mock)
+
+	_, found := store.FindMatch(
+		"SELECT * FROM users WHERE id = $1 AND status = $2",
+		"SELECT",
+		"",
+		[]interface{}{1, "active"},
+		false,
+	)
+	if !found {
+		t.Fatal("expected postgres placeholder query to match")
+	}
+
+	_, found = store.FindMatch(
+		"SELECT * FROM users WHERE id = $1 AND status = $2",
+		"SELECT",
+		"",
+		[]interface{}{1},
+		false,
+	)
+	if found {
+		t.Fatal("expected postgres placeholder query with wrong args to miss")
 	}
 }
 
@@ -305,9 +364,9 @@ func TestTypeFlexibleArgMatching(t *testing.T) {
 			wantMatch: true,
 		},
 		{
-			name:      "different value with structural match",
+			name:      "different value does not match",
 			args:      []interface{}{43},
-			wantMatch: true, // Structural matching allows different args
+			wantMatch: false,
 		},
 	}
 

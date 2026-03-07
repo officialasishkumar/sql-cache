@@ -1,5 +1,5 @@
-// Example: Using sql-cache in a service
-// This shows how to use sql-cache for services without a database.
+// Example: Using sql-cache in tests
+// This shows how to use sql-cache for testing services without a database.
 package main
 
 import (
@@ -80,8 +80,8 @@ func (s *UserService) CreateUser(name, email string) (int64, error) {
 // =============================================================================
 
 func testUserService() {
-	// Create a cached database (no real DB needed!)
-	db, err := wrapper.NewCachedOnly(wrapper.Options{
+	// Create a cached database in offline mode (no real DB needed!)
+	db, err := wrapper.NewOffline(wrapper.Options{
 		MockDir:        "./test-mocks/user-service",
 		SequentialMode: false, // Allow reusing cache entries
 	})
@@ -90,15 +90,15 @@ func testUserService() {
 	}
 	defer db.Close()
 
-	// Setup cache data
-	db.Capture(
+	// Populate cache with test data
+	db.Populate(
 		"SELECT id, name, email FROM users WHERE id = ?",
 		[]string{"id", "name", "email"},
 		[][]interface{}{{1, "Alice", "alice@example.com"}},
 		1,
 	)
 
-	db.Capture(
+	db.Populate(
 		"SELECT id, name, email FROM users",
 		[]string{"id", "name", "email"},
 		[][]interface{}{
@@ -107,10 +107,10 @@ func testUserService() {
 		},
 	)
 
-	db.CaptureExec(
+	db.PopulateExec(
 		"INSERT INTO users (name, email) VALUES (?, ?)",
-		3,  // lastInsertID
-		1,  // rowsAffected
+		3, // lastInsertID
+		1, // rowsAffected
 		"Charlie", "charlie@example.com",
 	)
 
@@ -157,13 +157,14 @@ func testErrorHandling() {
 	}
 	defer cache.Close()
 
-	// Capture an error response
-	cache.CaptureError(
+	// Populate an error response
+	cache.PopulateError(
 		"SELECT * FROM nonexistent",
 		"table not found: nonexistent",
 	)
 
-	cache.SetMode(sqlcache.ModeCached)
+	// Switch to offline mode (cache-only)
+	cache.SetMode(sqlcache.ModeOffline)
 
 	// Query should return the cached error
 	_, err = cache.Query("SELECT * FROM nonexistent")
@@ -173,7 +174,7 @@ func testErrorHandling() {
 		fmt.Printf("  FAIL: Unexpected result: %v\n", err)
 	}
 
-	// Query for uncached query should fail
+	// Query for uncached query should fail with cache miss
 	_, err = cache.Query("SELECT * FROM another_table")
 	if err != nil {
 		fmt.Printf("  PASS: Got error for unknown query: %v\n", truncate(err.Error(), 40))
@@ -195,24 +196,25 @@ func testSequentialConsumption() {
 	// Clear any existing entries from previous runs
 	cache.Clear()
 
-	// Capture same query multiple times with different results
-	cache.Capture(
+	// Populate same query multiple times with different results
+	cache.Populate(
 		"SELECT value FROM counter",
 		[]string{"value"},
 		[][]interface{}{{1}},
 	)
-	cache.Capture(
+	cache.Populate(
 		"SELECT value FROM counter",
 		[]string{"value"},
 		[][]interface{}{{2}},
 	)
-	cache.Capture(
+	cache.Populate(
 		"SELECT value FROM counter",
 		[]string{"value"},
 		[][]interface{}{{3}},
 	)
 
-	cache.SetMode(sqlcache.ModeCached)
+	// Switch to offline mode
+	cache.SetMode(sqlcache.ModeOffline)
 
 	// Each query consumes the next entry in sequence
 	for i := 1; i <= 3; i++ {

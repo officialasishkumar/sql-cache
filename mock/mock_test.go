@@ -41,31 +41,25 @@ func TestMockStore_FindMatch_ExactQuery(t *testing.T) {
 func TestMockStore_FindMatch_StructuralMatch(t *testing.T) {
 	store := NewMockStore("")
 
-	// Add a mock with structure
-	structure := "*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName"
-	mock := &Mock{
-		Version: Version,
-		Kind:    "SQL",
-		Name:    "test-mock-structure",
-		Spec: MockSpec{
-			Request: RequestSpec{
-				Query:     "SELECT * FROM users WHERE id = ?",
-				Args:      []interface{}{1},
-				Type:      "SELECT",
-				Structure: structure,
-			},
-			Response: ResponseSpec{
-				Columns: []string{"id", "name"},
-				Rows:    [][]interface{}{{1, "Alice"}},
-			},
-		},
-	}
+	mock := CreateMock(
+		"SELECT * FROM users WHERE id = 1 AND status = 'active'",
+		nil,
+		[]string{"id", "name"},
+		[][]interface{}{{1, "Alice"}},
+		0, 0, "",
+	)
+	mock.Name = "test-mock-structure"
 	store.Add(mock)
 
-	// Test structural match (different value, same placeholders)
-	found, ok := store.FindMatch("SELECT * FROM users WHERE id = ?", "SELECT", structure, []interface{}{2}, false)
+	found, ok := store.FindMatch(
+		"select * from users where status = 'active' and id = 1",
+		"SELECT",
+		"",
+		nil,
+		false,
+	)
 	if !ok {
-		t.Fatal("Expected to find a structural match")
+		t.Fatal("Expected to find a canonical match")
 	}
 	if found.Name != "test-mock-structure" {
 		t.Errorf("Expected mock name 'test-mock-structure', got %s", found.Name)

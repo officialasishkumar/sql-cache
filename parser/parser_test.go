@@ -111,30 +111,36 @@ func TestMatch(t *testing.T) {
 			minScore:       100,
 		},
 		{
-			name:           "structural match different value",
-			query1:         "SELECT * FROM users WHERE id = 1",
-			query2:         "SELECT * FROM users WHERE id = 2",
+			name:           "canonical match with reordered predicates",
+			query1:         "SELECT * FROM users WHERE id = 1 AND status = 'active'",
+			query2:         "select * from users where status = 'active' and id = 1",
 			wantExact:      false,
 			wantStructural: true,
 			minScore:       80,
 		},
 		{
-			// Same AST structure even with different column names (both are simple column refs)
-			name:           "same structure different columns",
+			name:           "different literal values do not match",
+			query1:         "SELECT * FROM users WHERE id = 1",
+			query2:         "SELECT * FROM users WHERE id = 2",
+			wantExact:      false,
+			wantStructural: false,
+			minScore:       30,
+		},
+		{
+			name:           "different columns do not match structurally",
 			query1:         "SELECT id FROM users WHERE id = 1",
 			query2:         "SELECT name FROM users WHERE id = 1",
 			wantExact:      false,
-			wantStructural: true, // Same structure in AST
-			minScore:       60,
+			wantStructural: false,
+			minScore:       30,
 		},
 		{
-			// Same AST structure even with different table names
-			name:           "same structure different tables",
+			name:           "different tables do not match structurally",
 			query1:         "SELECT * FROM users WHERE id = 1",
 			query2:         "SELECT * FROM orders WHERE id = 1",
 			wantExact:      false,
-			wantStructural: true, // Same structure in AST
-			minScore:       60,
+			wantStructural: false,
+			minScore:       30,
 		},
 		{
 			name:           "completely different",
@@ -205,9 +211,9 @@ func TestGetQueryStructureCached(t *testing.T) {
 		t.Error("structure is empty")
 	}
 
-	// Should contain expected AST node types
-	if !contains(structure, "Select") {
-		t.Errorf("structure should contain 'Select', got: %s", structure)
+	// Should contain the canonical SQL text.
+	if !contains(structure, "SELECT") {
+		t.Errorf("structure should contain 'SELECT', got: %s", structure)
 	}
 }
 

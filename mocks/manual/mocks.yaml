@@ -2,55 +2,247 @@ version: sql-cache-v1
 kind: SQL
 name: mock-1772270429102005000
 spec:
-    metadata:
-        recorded_at: "2026-02-28T14:50:29+05:30"
-    request:
-        query: SELECT count(*) FROM users
-        type: SELECT
-        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.CountStar->sqlparser.IdentifierCI'
-    response:
-        columns:
-            - count
-        rows:
-            - - 42
-    created: 1772270429
-
----
-version: sql-cache-v1
-kind: SQL
-name: mock-1772270429102017000
-spec:
-    metadata:
-        recorded_at: "2026-02-28T14:50:29+05:30"
-    request:
-        query: SELECT name FROM users WHERE active = ?
-        args:
-            - true
-        type: SELECT
-        structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.Where->*sqlparser.ComparisonExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Argument'
-    response:
-        columns:
-            - name
-        rows:Check the sequel. 
-            - - Alice
-            - - Bob
-            - - Charlie
-    created: 1772270429
+    Request:
+        Query: ""
+        Type: ""
+    Response: {}
+    Created: 0
 
 ---
 version: sql-cache-v1
 kind: SQL
 name: mock-1772270429102086000
 spec:
-    metadata:
-        recorded_at: "2026-02-28T14:50:29+05:30"
-    request:
-        query: INSERT INTO users (name) VALUES (?)
-        args:
+    Request:
+        Query: ""
+        Type: ""
+    Response: {}
+    Created: 0
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772911630742808000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T00:57:10+05:30"
+    Request:
+        Query: SELECT count(*) FROM users
+        Type: SELECT
+        Structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.CountStar->sqlparser.IdentifierCI'
+        QueryHash: eb9c3522711fa552
+    Response:
+        Columns:
+            - count
+        Rows:
+            - - 42
+        RowCount: 1
+    Created: 1772911630
+    ReqTimestampMock: 2026-03-08T00:57:10.742808+05:30
+    ResTimestampMock: 2026-03-08T00:57:10.742808+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772911630742818000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T00:57:10+05:30"
+    Request:
+        Query: SELECT name FROM users WHERE active = ?
+        Args:
+            - true
+        Type: SELECT
+        Structure: '*sqlparser.Select->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.SelectExprs->*sqlparser.AliasedExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCI->*sqlparser.Where->*sqlparser.ComparisonExpr->*sqlparser.ColName->sqlparser.IdentifierCI->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->*sqlparser.Argument'
+        PlaceholderCount: 1
+        QueryHash: e55b78eff07bbf8b
+    Response:
+        Columns:
+            - name
+        Rows:
+            - - Alice
+            - - Bob
+            - - Charlie
+        RowCount: 3
+    Created: 1772911630
+    ReqTimestampMock: 2026-03-08T00:57:10.742818+05:30
+    ResTimestampMock: 2026-03-08T00:57:10.742818+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772911630742883000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T00:57:10+05:30"
+    Request:
+        Query: INSERT INTO users (name) VALUES (?)
+        Args:
             - NewUser
-        type: INSERT
-        structure: '*sqlparser.Insert->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.Columns->sqlparser.IdentifierCI->sqlparser.Values->sqlparser.ValTuple->*sqlparser.Argument'
-    response:
-        last_insert_id: 100
-        rows_affected: 1
-    created: 1772270429
+        Type: INSERT
+        Structure: '*sqlparser.Insert->*sqlparser.AliasedTableExpr->sqlparser.TableName->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.IdentifierCS->sqlparser.Columns->sqlparser.IdentifierCI->sqlparser.Values->sqlparser.ValTuple->*sqlparser.Argument'
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: a99b7a03f4259f4c
+    Response:
+        LastInsertID: 100
+        RowsAffected: 1
+    Created: 1772911630
+    ReqTimestampMock: 2026-03-08T00:57:10.742883+05:30
+    ResTimestampMock: 2026-03-08T00:57:10.742883+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772912471692045000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:11:11+05:30"
+    Request:
+        Query: SELECT count(*) FROM users
+        Type: SELECT
+        Tables:
+            - users
+        Structure: SELECT count(*) FROM `users`
+        QueryHash: eb9c3522711fa552
+    Response:
+        Columns:
+            - count
+        Rows:
+            - - 42
+        RowCount: 1
+    Created: 1772912471
+    ReqTimestampMock: 2026-03-08T01:11:11.692045+05:30
+    ResTimestampMock: 2026-03-08T01:11:11.692045+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772912471692066000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:11:11+05:30"
+    Request:
+        Query: SELECT name FROM users WHERE active = ?
+        Args:
+            - true
+        Type: SELECT
+        Tables:
+            - users
+        Structure: SELECT `name` FROM `users` WHERE `active` = :v1
+        PlaceholderCount: 1
+        QueryHash: e55b78eff07bbf8b
+    Response:
+        Columns:
+            - name
+        Rows:
+            - - Alice
+            - - Bob
+            - - Charlie
+        RowCount: 3
+    Created: 1772912471
+    ReqTimestampMock: 2026-03-08T01:11:11.692066+05:30
+    ResTimestampMock: 2026-03-08T01:11:11.692066+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772912471692156000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:11:11+05:30"
+    Request:
+        Query: INSERT INTO users (name) VALUES (?)
+        Args:
+            - NewUser
+        Type: INSERT
+        Tables:
+            - users
+        Structure: INSERT INTO `users`(`name`) VALUES (:v1)
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: a99b7a03f4259f4c
+    Response:
+        LastInsertID: 100
+        RowsAffected: 1
+    Created: 1772912471
+    ReqTimestampMock: 2026-03-08T01:11:11.692156+05:30
+    ResTimestampMock: 2026-03-08T01:11:11.692156+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772913417107753000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:26:57+05:30"
+    Request:
+        Query: SELECT count(*) FROM users
+        Type: SELECT
+        Tables:
+            - users
+        Structure: SELECT count(*) FROM `users`
+        QueryHash: eb9c3522711fa552
+    Response:
+        Columns:
+            - count
+        Rows:
+            - - 42
+        RowCount: 1
+    Created: 1772913417
+    ReqTimestampMock: 2026-03-08T01:26:57.107753+05:30
+    ResTimestampMock: 2026-03-08T01:26:57.107753+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772913417107791000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:26:57+05:30"
+    Request:
+        Query: SELECT name FROM users WHERE active = ?
+        Args:
+            - true
+        Type: SELECT
+        Tables:
+            - users
+        Structure: SELECT `name` FROM `users` WHERE `active` = :v1
+        PlaceholderCount: 1
+        QueryHash: e55b78eff07bbf8b
+    Response:
+        Columns:
+            - name
+        Rows:
+            - - Alice
+            - - Bob
+            - - Charlie
+        RowCount: 3
+    Created: 1772913417
+    ReqTimestampMock: 2026-03-08T01:26:57.107791+05:30
+    ResTimestampMock: 2026-03-08T01:26:57.107791+05:30
+
+---
+version: sql-cache/v1
+kind: SQL
+name: mock-1772913417107889000
+spec:
+    Metadata:
+        captured_at: "2026-03-08T01:26:57+05:30"
+    Request:
+        Query: INSERT INTO users (name) VALUES (?)
+        Args:
+            - NewUser
+        Type: INSERT
+        Tables:
+            - users
+        Structure: INSERT INTO `users`(`name`) VALUES (:v1)
+        PlaceholderCount: 1
+        IsDML: true
+        QueryHash: a99b7a03f4259f4c
+    Response:
+        LastInsertID: 100
+        RowsAffected: 1
+    Created: 1772913417
+    ReqTimestampMock: 2026-03-08T01:26:57.107889+05:30
+    ResTimestampMock: 2026-03-08T01:26:57.107889+05:30
