@@ -13,10 +13,19 @@ type CachedRows struct {
 	err      error
 }
 
+// NewCachedRows creates a row set from already-captured values.
+func NewCachedRows(columns []string, rows [][]interface{}) *CachedRows {
+	return &CachedRows{
+		columns:  cloneColumns(columns),
+		rows:     cloneRows(rows),
+		rowIndex: -1,
+	}
+}
+
 // NewCachedRowsFromSQL creates CachedRows from sql.Rows.
 func NewCachedRowsFromSQL(rows *sql.Rows) (*CachedRows, error) {
 	if rows == nil {
-		return &CachedRows{columns: []string{}, rows: [][]interface{}{}, rowIndex: -1}, nil
+		return NewCachedRows([]string{}, [][]interface{}{}), nil
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -46,7 +55,7 @@ func NewCachedRowsFromSQL(rows *sql.Rows) (*CachedRows, error) {
 		return nil, fmt.Errorf("rows iteration error: %w", err)
 	}
 
-	return &CachedRows{columns: columns, rows: allRows, rowIndex: -1}, nil
+	return NewCachedRows(columns, allRows), nil
 }
 
 func copyValue(v interface{}) interface{} {
@@ -56,6 +65,34 @@ func copyValue(v interface{}) interface{} {
 		return cp
 	}
 	return v
+}
+
+func cloneColumns(columns []string) []string {
+	if columns == nil {
+		return nil
+	}
+
+	cloned := make([]string, len(columns))
+	copy(cloned, columns)
+	return cloned
+}
+
+func cloneRows(rows [][]interface{}) [][]interface{} {
+	if rows == nil {
+		return nil
+	}
+
+	cloned := make([][]interface{}, len(rows))
+	for i, row := range rows {
+		if row == nil {
+			continue
+		}
+		cloned[i] = make([]interface{}, len(row))
+		for j, value := range row {
+			cloned[i][j] = copyValue(value)
+		}
+	}
+	return cloned
 }
 
 // Columns returns the column names.

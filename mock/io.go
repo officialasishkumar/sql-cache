@@ -1,10 +1,12 @@
 package mock
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -46,8 +48,6 @@ func (s *MockStore) Save() error {
 
 // Load loads cache entries from disk.
 func (s *MockStore) Load() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.dir == "" {
 		return nil
 	}
@@ -61,34 +61,38 @@ func (s *MockStore) Load() error {
 		return fmt.Errorf("failed to read mocks file: %w", err)
 	}
 
-	docs := splitYAMLDocuments(data)
-	s.mocks = make([]*Mock, 0, len(docs))
-	s.mockIndex = make(map[string]*Mock)
-	for _, doc := range docs {
-		if len(strings.TrimSpace(string(doc))) == 0 {
-			continue
-		}
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	loaded := make([]*Mock, 0)
+	index := 0
+
+	for {
 		var mock Mock
-		if err := yaml.Unmarshal(doc, &mock); err != nil {
+		err := decoder.Decode(&mock)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to decode cache entry %d: %w", index+1, err)
+		}
+		if mock.Name == "" && mock.Kind == "" && mock.Version == "" && mock.Spec.Request.Query == "" {
 			continue
 		}
+
 		mock.Spec.Consumed = false
 		mock.Spec.SortOrder = 0
-		key := s.generateKey(&mock)
-		s.mocks = append(s.mocks, &mock)
-		s.mockIndex[key] = &mock
+		loaded = append(loaded, &mock)
+		index++
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.mocks = make([]*Mock, 0, len(loaded))
+	s.mockIndex = make(map[string]*Mock, len(loaded))
+	for _, mock := range loaded {
+		key := s.generateKey(mock)
+		s.mocks = append(s.mocks, mock)
+		s.mockIndex[key] = mock
 	}
 	return nil
-}
-
-func splitYAMLDocuments(data []byte) [][]byte {
-	parts := strings.Split(string(data), "\n---")
-	result := make([][]byte, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimPrefix(part, "\n")
-		if len(strings.TrimSpace(part)) > 0 {
-			result = append(result, []byte(part))
-		}
-	}
-	return result
 }

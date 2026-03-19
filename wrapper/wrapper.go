@@ -30,6 +30,7 @@ type Options struct {
 	OnDatabaseHit func(query string, args []interface{})
 	Logger        *log.Logger
 	OnError       func(err error, context string)
+	CacheDBErrors bool
 }
 
 // Open creates a new sql.DB and wraps it with caching in one step.
@@ -58,6 +59,7 @@ func Wrap(db *sql.DB, opts Options) (*DB, error) {
 		Logger:         opts.Logger,
 		OnError:        opts.OnError,
 		SequentialMode: opts.SequentialMode,
+		CacheDBErrors:  opts.CacheDBErrors,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cache: %w", err)
@@ -77,6 +79,7 @@ func NewOffline(opts Options) (*DB, error) {
 		Logger:         opts.Logger,
 		OnError:        opts.OnError,
 		SequentialMode: opts.SequentialMode,
+		CacheDBErrors:  opts.CacheDBErrors,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cache: %w", err)

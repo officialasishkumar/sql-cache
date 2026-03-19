@@ -6,6 +6,7 @@ package sqlcache
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 
@@ -47,6 +48,7 @@ type Options struct {
 
 	Logger         *log.Logger
 	SequentialMode bool
+	CacheDBErrors  bool
 }
 
 // Cache is the main SQL caching interface.
@@ -83,8 +85,11 @@ var (
 // New creates a new SQL cache instance.
 func New(opts Options) (*Cache, error) {
 	m, err := matcher.NewMatcher()
-	if err != nil && opts.OnError != nil {
-		opts.OnError(err, "creating matcher")
+	if err != nil {
+		if opts.OnError != nil {
+			opts.OnError(err, "creating matcher")
+		}
+		return nil, fmt.Errorf("creating matcher: %w", err)
 	}
 
 	mockDir := opts.MockDir
@@ -103,6 +108,7 @@ func New(opts Options) (*Cache, error) {
 
 	if err := mockStore.Load(); err != nil {
 		c.logError(err, "loading cache")
+		return nil, fmt.Errorf("loading cache: %w", err)
 	}
 
 	return c, nil

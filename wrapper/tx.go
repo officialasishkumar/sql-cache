@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"sync"
+
+	sqlcache "github.com/officialasishkumar/sql-cache"
 )
 
 // Tx wraps a transaction with caching.
@@ -24,7 +26,18 @@ func (tx *Tx) QueryContext(ctx context.Context, query string, args ...interface{
 	if tx.isDone() {
 		return nil, sql.ErrTxDone
 	}
-	return tx.db.QueryContext(ctx, query, args...)
+	if tx == nil || tx.db == nil {
+		return nil, sql.ErrConnDone
+	}
+	if tx.db.GetMode() == sqlcache.ModeOffline || tx.underlying == nil {
+		return tx.db.QueryContext(ctx, query, args...)
+	}
+
+	rows, err := tx.underlying.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	return &Rows{live: rows}, nil
 }
 
 // QueryRow executes expecting one row.
@@ -34,10 +47,8 @@ func (tx *Tx) QueryRow(query string, args ...interface{}) *Row {
 
 // QueryRowContext executes with context expecting one row.
 func (tx *Tx) QueryRowContext(ctx context.Context, query string, args ...interface{}) *Row {
-	if tx.isDone() {
-		return &Row{err: sql.ErrTxDone}
-	}
-	return tx.db.QueryRowContext(ctx, query, args...)
+	rows, err := tx.QueryContext(ctx, query, args...)
+	return &Row{rows: rows, err: err}
 }
 
 // Exec executes a query.
@@ -50,7 +61,13 @@ func (tx *Tx) ExecContext(ctx context.Context, query string, args ...interface{}
 	if tx.isDone() {
 		return nil, sql.ErrTxDone
 	}
-	return tx.db.ExecContext(ctx, query, args...)
+	if tx == nil || tx.db == nil {
+		return nil, sql.ErrConnDone
+	}
+	if tx.db.GetMode() == sqlcache.ModeOffline || tx.underlying == nil {
+		return tx.db.ExecContext(ctx, query, args...)
+	}
+	return tx.underlying.ExecContext(ctx, query, args...)
 }
 
 // Commit commits the transaction.
@@ -82,6 +99,9 @@ func (tx *Tx) Rollback() error {
 }
 
 func (tx *Tx) isDone() bool {
+	if tx == nil {
+		return true
+	}
 	tx.mu.Lock()
 	defer tx.mu.Unlock()
 	return tx.done
@@ -97,6 +117,12 @@ func (tx *Tx) PrepareContext(ctx context.Context, query string) (*Stmt, error) {
 	if tx.isDone() {
 		return nil, sql.ErrTxDone
 	}
+	if tx == nil || tx.db == nil {
+		return nil, sql.ErrConnDone
+	}
+	if tx.db.GetMode() == sqlcache.ModeOffline || tx.underlying == nil {
+		return &Stmt{query: query, db: tx.db, tx: tx}, nil
+	}
 
 	var (
 		stmt *sql.Stmt
@@ -108,5 +134,5 @@ func (tx *Tx) PrepareContext(ctx context.Context, query string) (*Stmt, error) {
 			return nil, err
 		}
 	}
-	return &Stmt{underlying: stmt, query: query, db: tx.db}, nil
+	return &Stmt{underlying: stmt, query: query, db: tx.db, tx: tx}, nil
 }

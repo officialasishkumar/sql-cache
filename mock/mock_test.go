@@ -381,3 +381,18 @@ func TestMatchPattern(t *testing.T) {
 		})
 	}
 }
+
+func TestMockStore_Load_InvalidYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "mocks.yaml"), []byte("kind: SQL\nspec:\n  Request: ["), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	store := NewMockStore(tmpDir)
+	if err := store.Load(); err == nil {
+		t.Fatal("Load() unexpectedly succeeded with invalid YAML")
+	}
+	if store.Size() != 0 {
+		t.Fatalf("store size = %d, want 0", store.Size())
+	}
+}

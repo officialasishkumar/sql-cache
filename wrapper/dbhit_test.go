@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -97,5 +99,63 @@ func TestNewOffline_NeverHitsDatabase(t *testing.T) {
 
 	if strings.Contains(logBuf.String(), "database fallback") {
 		t.Fatalf("did not expect database fallback log, got %q", logBuf.String())
+	}
+}
+
+func TestWrap_DoesNotCacheLiveErrorsByDefault(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open() error = %v", err)
+	}
+	defer db.Close()
+
+	var dbHitCount int
+	cachedDB, err := Wrap(db, Options{
+		MockDir: t.TempDir(),
+		OnDatabaseHit: func(query string, args []interface{}) {
+			dbHitCount++
+		},
+	})
+	if err != nil {
+		t.Fatalf("Wrap() error = %v", err)
+	}
+	defer cachedDB.Close()
+
+	for i := 0; i < 2; i++ {
+		if _, err := cachedDB.Query(`SELECT name FROM missing_users WHERE id = ?`, 1); err == nil {
+			t.Fatalf("Query() unexpectedly succeeded on iteration %d", i+1)
+		}
+	}
+
+	if dbHitCount != 2 {
+		t.Fatalf("dbHitCount = %d, want 2", dbHitCount)
+	}
+
+	stats := cachedDB.Stats()
+	if stats.DatabaseHits != 2 {
+		t.Fatalf("stats.DatabaseHits = %d, want 2", stats.DatabaseHits)
+	}
+	if stats.Errors != 2 {
+		t.Fatalf("stats.Errors = %d, want 2", stats.Errors)
+	}
+	if stats.Saved != 0 {
+		t.Fatalf("stats.Saved = %d, want 0", stats.Saved)
+	}
+}
+
+func TestWrap_FailsOnInvalidMockFile(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open() error = %v", err)
+	}
+	defer db.Close()
+
+	mockDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(mockDir, "mocks.yaml"), []byte("kind: SQL\nspec:\n  Request: ["), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if _, err := Wrap(db, Options{MockDir: mockDir}); err == nil {
+		t.Fatal("Wrap() unexpectedly succeeded with invalid mock file")
 	}
 }

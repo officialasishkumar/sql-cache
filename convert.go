@@ -3,6 +3,10 @@ package sqlcache
 import (
 	"database/sql"
 	"fmt"
+	"math"
+	"reflect"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -10,6 +14,14 @@ import (
 type CachedResult struct {
 	lastInsertID int64
 	rowsAffected int64
+}
+
+// NewCachedResult creates an exec result from already-captured values.
+func NewCachedResult(lastInsertID, rowsAffected int64) *CachedResult {
+	return &CachedResult{
+		lastInsertID: lastInsertID,
+		rowsAffected: rowsAffected,
+	}
 }
 
 // LastInsertId returns the last insert ID.
@@ -29,6 +41,12 @@ func (r *CachedResult) RowsAffected() (int64, error) {
 }
 
 func convertAssign(dest, src interface{}) error {
+	if dest == nil {
+		return fmt.Errorf("destination is nil")
+	}
+	if scanner, ok := dest.(sql.Scanner); ok {
+		return scanner.Scan(normalizeScannerValue(src))
+	}
 	if src == nil {
 		return setZeroValue(dest)
 	}
@@ -38,6 +56,8 @@ func convertAssign(dest, src interface{}) error {
 		*d = toString(src)
 	case *[]byte:
 		*d = toBytes(src)
+	case *sql.RawBytes:
+		*d = sql.RawBytes(toBytes(src))
 	case *int:
 		v, err := toInt64(src)
 		if err != nil {
@@ -120,30 +140,8 @@ func convertAssign(dest, src interface{}) error {
 		*d = v
 	case *interface{}:
 		*d = src
-	case *sql.NullString:
-		d.Valid = src != nil
-		if d.Valid {
-			d.String = toString(src)
-		}
-	case *sql.NullInt64:
-		d.Valid = src != nil
-		if d.Valid {
-			v, _ := toInt64(src)
-			d.Int64 = v
-		}
-	case *sql.NullFloat64:
-		d.Valid = src != nil
-		if d.Valid {
-			v, _ := toFloat64(src)
-			d.Float64 = v
-		}
-	case *sql.NullBool:
-		d.Valid = src != nil
-		if d.Valid {
-			d.Bool = toBool(src)
-		}
 	default:
-		return fmt.Errorf("unsupported destination type: %T", dest)
+		return assignReflect(dest, src)
 	}
 	return nil
 }
@@ -153,6 +151,8 @@ func setZeroValue(dest interface{}) error {
 	case *string:
 		*d = ""
 	case *[]byte:
+		*d = nil
+	case *sql.RawBytes:
 		*d = nil
 	case *int:
 		*d = 0
@@ -184,22 +184,85 @@ func setZeroValue(dest interface{}) error {
 		*d = time.Time{}
 	case *interface{}:
 		*d = nil
-	case *sql.NullString:
-		d.Valid = false
-		d.String = ""
-	case *sql.NullInt64:
-		d.Valid = false
-		d.Int64 = 0
-	case *sql.NullFloat64:
-		d.Valid = false
-		d.Float64 = 0
-	case *sql.NullBool:
-		d.Valid = false
-		d.Bool = false
 	default:
-		return fmt.Errorf("unsupported destination type for nil: %T", dest)
+		destVal := reflect.ValueOf(dest)
+		if destVal.Kind() != reflect.Pointer || destVal.IsNil() {
+			return fmt.Errorf("unsupported destination type for nil: %T", dest)
+		}
+		destVal.Elem().SetZero()
 	}
 	return nil
+}
+
+func assignReflect(dest, src interface{}) error {
+	destVal := reflect.ValueOf(dest)
+	if destVal.Kind() != reflect.Pointer || destVal.IsNil() {
+		return fmt.Errorf("unsupported destination type: %T", dest)
+	}
+
+	srcVal := reflect.ValueOf(src)
+	if !srcVal.IsValid() {
+		destVal.Elem().SetZero()
+		return nil
+	}
+
+	if srcVal.Type().AssignableTo(destVal.Elem().Type()) {
+		destVal.Elem().Set(srcVal)
+		return nil
+	}
+	if srcVal.Type().ConvertibleTo(destVal.Elem().Type()) {
+		destVal.Elem().Set(srcVal.Convert(destVal.Elem().Type()))
+		return nil
+	}
+	return fmt.Errorf("unsupported destination type: %T", dest)
+}
+
+func normalizeScannerValue(src interface{}) interface{} {
+	switch v := src.(type) {
+	case nil:
+		return nil
+	case int:
+		return int64(v)
+	case int8:
+		return int64(v)
+	case int16:
+		return int64(v)
+	case int32:
+		return int64(v)
+	case int64:
+		return v
+	case uint:
+		return int64(v)
+	case uint8:
+		return int64(v)
+	case uint16:
+		return int64(v)
+	case uint32:
+		return int64(v)
+	case uint64:
+		if v > math.MaxInt64 {
+			return strconv.FormatUint(v, 10)
+		}
+		return int64(v)
+	case float32:
+		return float64(v)
+	case float64:
+		return v
+	case sql.RawBytes:
+		return toBytes([]byte(v))
+	case []byte:
+		if parsed, err := toTime(v); err == nil {
+			return parsed
+		}
+		return toBytes(v)
+	case string:
+		if parsed, err := toTime(v); err == nil {
+			return parsed
+		}
+		return v
+	default:
+		return src
+	}
 }
 
 func toString(v interface{}) string {
@@ -216,7 +279,13 @@ func toString(v interface{}) string {
 func toBytes(v interface{}) []byte {
 	switch s := v.(type) {
 	case []byte:
-		return s
+		cp := make([]byte, len(s))
+		copy(cp, s)
+		return cp
+	case sql.RawBytes:
+		cp := make([]byte, len(s))
+		copy(cp, s)
+		return cp
 	case string:
 		return []byte(s)
 	default:
@@ -256,9 +325,7 @@ func toInt64(v interface{}) (int64, error) {
 		}
 		return 0, nil
 	case string:
-		var i int64
-		_, err := fmt.Sscanf(n, "%d", &i)
-		return i, err
+		return strconv.ParseInt(strings.TrimSpace(n), 10, 64)
 	}
 	return 0, fmt.Errorf("cannot convert %T to int64", v)
 }
@@ -289,6 +356,8 @@ func toUint64(v interface{}) (uint64, error) {
 		return uint64(n), nil
 	case float64:
 		return uint64(n), nil
+	case string:
+		return strconv.ParseUint(strings.TrimSpace(n), 10, 64)
 	}
 	return 0, fmt.Errorf("cannot convert %T to uint64", v)
 }
@@ -320,9 +389,7 @@ func toFloat64(v interface{}) (float64, error) {
 	case uint64:
 		return float64(n), nil
 	case string:
-		var f float64
-		_, err := fmt.Sscanf(n, "%f", &f)
-		return f, err
+		return strconv.ParseFloat(strings.TrimSpace(n), 64)
 	}
 	return 0, fmt.Errorf("cannot convert %T to float64", v)
 }
@@ -338,7 +405,12 @@ func toBool(v interface{}) bool {
 		n, _ := toUint64(v)
 		return n != 0
 	case string:
-		return b == "true" || b == "1" || b == "yes"
+		normalized := strings.TrimSpace(strings.ToLower(b))
+		if normalized == "yes" {
+			return true
+		}
+		parsed, err := strconv.ParseBool(normalized)
+		return err == nil && parsed
 	}
 	return false
 }
