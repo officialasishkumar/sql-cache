@@ -112,17 +112,26 @@ func (c *CachedConn) Close() error {
 	return c.underlying.Close()
 }
 
-// Begin starts a transaction
+// Begin starts a transaction.
 func (c *CachedConn) Begin() (driver.Tx, error) {
+	return c.BeginTx(context.Background(), driver.TxOptions{})
+}
+
+// BeginTx starts a transaction with context and options.
+func (c *CachedConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	if cb, ok := c.underlying.(driver.ConnBeginTx); ok {
+		tx, err := cb.BeginTx(ctx, opts)
+		if err != nil {
+			return nil, err
+		}
+		return &CachedTx{underlying: tx, conn: c}, nil
+	}
+	//lint:ignore SA1019 fallback for drivers not implementing ConnBeginTx
 	tx, err := c.underlying.Begin()
 	if err != nil {
 		return nil, err
 	}
-
-	return &CachedTx{
-		underlying: tx,
-		conn:       c,
-	}, nil
+	return &CachedTx{underlying: tx, conn: c}, nil
 }
 
 // QueryContext implements driver.QueryerContext.
@@ -247,7 +256,7 @@ func (s *CachedStmt) Exec(args []driver.Value) (driver.Result, error) {
 	}
 
 	s.conn.cache.NotifyDatabaseHit(s.query, plainArgs...)
-	liveResult, err := s.underlying.Exec(args)
+	liveResult, err := stmtExec(s.underlying, args)
 	if err != nil {
 		s.conn.cache.CaptureError(s.query, err, plainArgs...)
 		return nil, err
@@ -282,7 +291,7 @@ func (s *CachedStmt) Query(args []driver.Value) (driver.Rows, error) {
 	}
 
 	s.conn.cache.NotifyDatabaseHit(s.query, plainArgs...)
-	liveRows, err := s.underlying.Query(args)
+	liveRows, err := stmtQuery(s.underlying, args)
 	if err != nil {
 		s.conn.cache.CaptureError(s.query, err, plainArgs...)
 		return nil, err
@@ -395,7 +404,7 @@ func (c *CachedConn) queryUnderlyingContext(ctx context.Context, query string, a
 		return nil, err
 	}
 
-	rows, err := stmt.Query(namedValuesToValues(args))
+	rows, err := stmtQuery(stmt, namedValuesToValues(args))
 	if err != nil {
 		_ = stmt.Close()
 		return nil, err
@@ -414,7 +423,7 @@ func (c *CachedConn) execUnderlyingContext(ctx context.Context, query string, ar
 	}
 	defer stmt.Close()
 
-	return stmt.Exec(namedValuesToValues(args))
+	return stmtExec(stmt, namedValuesToValues(args))
 }
 
 type stmtBackedRows struct {
@@ -546,4 +555,28 @@ func valuesToInterfaces(args []driver.Value) []interface{} {
 		plainArgs[i] = arg
 	}
 	return plainArgs
+}
+
+func valuesToNamedValues(args []driver.Value) []driver.NamedValue {
+	named := make([]driver.NamedValue, len(args))
+	for i, arg := range args {
+		named[i] = driver.NamedValue{Ordinal: i + 1, Value: arg}
+	}
+	return named
+}
+
+func stmtExec(stmt driver.Stmt, args []driver.Value) (driver.Result, error) {
+	if s, ok := stmt.(driver.StmtExecContext); ok {
+		return s.ExecContext(context.Background(), valuesToNamedValues(args))
+	}
+	//lint:ignore SA1019 fallback for drivers not implementing StmtExecContext
+	return stmt.Exec(args)
+}
+
+func stmtQuery(stmt driver.Stmt, args []driver.Value) (driver.Rows, error) {
+	if s, ok := stmt.(driver.StmtQueryContext); ok {
+		return s.QueryContext(context.Background(), valuesToNamedValues(args))
+	}
+	//lint:ignore SA1019 fallback for drivers not implementing StmtQueryContext
+	return stmt.Query(args)
 }

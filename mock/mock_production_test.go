@@ -256,16 +256,13 @@ func TestSequentialConsumption(t *testing.T) {
 	}
 
 	// Sequential consumption should work
-	var results []int
 	for i := 1; i <= 3; i++ {
 		matched, found := store.FindMatch("SELECT * FROM users WHERE id = ?", "SELECT", "", []interface{}{i}, true)
 		if !found {
 			t.Fatalf("Expected to find mock for iteration %d", i)
 		}
-		if len(matched.Spec.Response.Rows) > 0 {
-			if id, ok := matched.Spec.Response.Rows[0][0].(int); ok {
-				results = append(results, id)
-			}
+		if len(matched.Spec.Response.Rows) == 0 {
+			t.Fatalf("Expected non-empty rows for iteration %d", i)
 		}
 	}
 
