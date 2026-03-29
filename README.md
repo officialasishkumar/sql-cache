@@ -1,269 +1,169 @@
 # SQL Cache
 
-`sql-cache` is a Go library that records SQL responses into YAML and replays them on later requests.
+A Go library that records your SQL query responses into YAML files and replays them later — no database needed.
 
-The default flow is cache-through:
-- cache hit: return the stored response
-- cache miss: execute the real query, capture the response, save it to `mocks.yaml`, return it
+## How it works
 
-It also supports a strict offline mode where the real database is never touched.
+```
+Your Go code  →  sql-cache  →  database
+                    ↓
+               mocks.yaml (saved responses)
+```
 
-## Why this exists
+1. Your code runs a SQL query through sql-cache
+2. **First run** — query goes to the real database, response is saved to `mocks.yaml`
+3. **Next run** — same query is served from the YAML file, database is never hit
 
-This project is built for application-level SQL caching and replay. It works by intercepting calls at the `database/sql` boundary, so it is portable across Linux, macOS, and Windows.
+That's it. Your queries get cached automatically.
 
-You do not need eBPF or traffic redirection for the normal library workflow.
-
-Use eBPF only if you want a separate zero-instrumentation agent for applications that do not import this library. That is a different product surface and should stay separate from the core package.
-
-## What you get
-
-- cache-through recording in `ModeAuto`
-- strict cache-only replay in `ModeOffline`
-- deterministic request matching based on query shape and arguments
-- YAML-backed mocks that can be inspected and versioned
-- `database/sql` wrapper for easy adoption
-- explicit logging and callbacks when a real DB fallback happens
-- sequential consumption mode for ordered test scenarios
-- query invalidation by exact query, table, or pattern
-
-## Installation
+## Install
 
 ```bash
 go get github.com/officialasishkumar/sql-cache
 ```
 
-## Operating modes
+## Quick example
 
-| Mode | Behavior |
-| --- | --- |
-| `ModeAuto` | Look up a mock first. On miss, hit the real DB, capture the result, save it, and return it. |
-| `ModeOffline` | Look up a mock only. On miss, return `ErrCacheMiss`. No real DB fallback. |
-
-If you need a hard guarantee that production or tests never touch the database, use `ModeOffline`.
-
-## Quick start
-
-### Wrap an existing `*sql.DB`
+Copy this into `main.go` and run it. It uses SQLite in-memory so there's nothing to set up.
 
 ```go
 package main
 
 import (
-    "database/sql"
-    "log"
-    "os"
+	"database/sql"
+	"fmt"
+	"log"
 
-    "github.com/officialasishkumar/sql-cache/wrapper"
-    _ "github.com/mattn/go-sqlite3"
+	sqlcache "github.com/officialasishkumar/sql-cache"
+	"github.com/officialasishkumar/sql-cache/wrapper"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
-    db, err := sql.Open("sqlite3", "app.db")
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer db.Close()
+	// 1. Open a normal database connection
+	db, _ := sql.Open("sqlite3", ":memory:")
+	defer db.Close()
 
-    cachedDB, err := wrapper.Wrap(db, wrapper.Options{
-        MockDir: "./mocks",
-        Logger:  log.New(os.Stdout, "sql-cache ", log.LstdFlags),
-        OnDatabaseHit: func(query string, args []interface{}) {
-            log.Printf("REAL DB HIT: %s args=%v", query, args)
-        },
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer cachedDB.Close()
+	db.Exec(`CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)`)
+	db.Exec(`INSERT INTO users (name) VALUES ('Alice'), ('Bob')`)
 
-    row := cachedDB.QueryRow("SELECT id, name FROM users WHERE id = ?", 1)
+	// 2. Wrap it with sql-cache
+	cached, _ := wrapper.Wrap(db, wrapper.Options{MockDir: "./mocks"})
+	defer cached.Close()
 
-    var id int
-    var name string
-    if err := row.Scan(&id, &name); err != nil {
-        log.Fatal(err)
-    }
+	// 3. Query as usual — first call hits DB and saves to mocks.yaml
+	row := cached.QueryRow("SELECT id, name FROM users WHERE id = ?", 1)
+	var id int
+	var name string
+	row.Scan(&id, &name)
+	fmt.Printf("From DB: id=%d name=%s\n", id, name)
+
+	// 4. Same query again — served from cache, no DB call
+	row = cached.QueryRow("SELECT id, name FROM users WHERE id = ?", 1)
+	row.Scan(&id, &name)
+	fmt.Printf("From cache: id=%d name=%s\n", id, name)
+
+	// 5. Check stats
+	stats := cached.Stats()
+	fmt.Printf("Hits: %d, Misses: %d, Saved: %d\n", stats.Hits, stats.Misses, stats.Saved)
 }
 ```
 
-### Open and wrap in one step
-
-```go
-cachedDB, err := wrapper.Open("sqlite3", "app.db", wrapper.Options{
-    MockDir: "./mocks",
-})
+```bash
+go run main.go
 ```
 
-### Strict offline mode
-
-```go
-cachedDB, err := wrapper.NewOffline(wrapper.Options{
-    MockDir: "./mocks",
-})
-if err != nil {
-    log.Fatal(err)
-}
-defer cachedDB.Close()
-
-cachedDB.SetMode(sqlcache.ModeOffline)
-
-row := cachedDB.QueryRow("SELECT id, name FROM users WHERE id = ?", 1)
+Output:
+```
+From DB: id=1 name=Alice
+From cache: id=1 name=Alice
+Hits: 1, Misses: 1, Saved: 1
 ```
 
-In offline mode, an uncached query returns `sqlcache.ErrCacheMiss` and the real database is never called.
+After running, check `./mocks/mocks.yaml` — you'll see the cached response in plain YAML.
 
-## Real DB hit visibility
+## Two modes
 
-In `ModeAuto`, you can surface every fallback to the real database.
-
-Available controls:
-- `OnDatabaseHit func(query string, args []interface{})`
-- `Logger *log.Logger`
-- `Stats().DatabaseHits`
-
-Example:
+| Mode | What happens |
+|------|-------------|
+| **Auto** (default) | Cache miss → hits real DB → saves response → returns it. Cache hit → returns from cache. |
+| **Offline** | Cache miss → returns error. Cache hit → returns from cache. Database is never touched. |
 
 ```go
-cachedDB, err := wrapper.Wrap(db, wrapper.Options{
-    MockDir: "./mocks",
-    Logger:  log.New(os.Stdout, "", log.LstdFlags),
-    OnDatabaseHit: func(query string, args []interface{}) {
-        log.Printf("REAL DB HIT: %s args=%v", query, args)
-    },
-})
+// Auto mode (default)
+cached, _ := wrapper.Wrap(db, wrapper.Options{MockDir: "./mocks"})
+
+// Offline mode — no database needed at all
+cached, _ := wrapper.NewOffline(wrapper.Options{MockDir: "./mocks"})
 ```
 
-Behavior:
-- `ModeOffline`: no DB hit is possible
-- `ModeAuto`: each fallback increments `DatabaseHits`, fires `OnDatabaseHit`, and logs a warning if `Logger` is configured
+Offline mode is useful for tests and CI where you don't want a running database.
 
-## Manual population
+## Seed the cache without a database
 
-You can seed the cache without a live database.
+You can manually add entries so the cache works without ever connecting to a real DB.
 
 ```go
-cache, err := sqlcache.New(sqlcache.Options{MockDir: "./test-mocks"})
-if err != nil {
-    log.Fatal(err)
-}
-defer cache.Close()
+cache, _ := sqlcache.New(sqlcache.Options{MockDir: "./mocks"})
 
+// Add a SELECT response
 cache.Populate(
     "SELECT id, name FROM users WHERE id = ?",
-    []string{"id", "name"},
-    [][]interface{}{{1, "Alice"}},
-    1,
+    []string{"id", "name"},           // columns
+    [][]interface{}{{1, "Alice"}},     // rows
+    1,                                 // query args
 )
 
+// Add an INSERT response
 cache.PopulateExec(
     "INSERT INTO users (name) VALUES (?)",
-    101,
-    1,
-    "Alice",
+    100,       // lastInsertID
+    1,         // rowsAffected
+    "Charlie", // query args
 )
 
-cache.PopulateError(
-    "SELECT * FROM missing_table",
-    "table not found",
-)
-
+// Switch to offline — all queries served from cache
 cache.SetMode(sqlcache.ModeOffline)
 ```
 
-## Matching rules
+## Query matching
 
-Matching is deterministic. The cache does not do fuzzy best-effort replay.
+Matching is deterministic, not fuzzy. A cached response is returned only when:
 
-A request matches when these checks hold:
-- placeholder count matches
-- argument values match
-- query type matches when available
-- exact SQL matches, or canonical SQL fingerprints match
+- Query text matches (exact or structurally equivalent via AST fingerprint)
+- Argument values match exactly
+- Placeholder count matches
+- Query type matches (SELECT, INSERT, etc.)
 
-That means this does not happen anymore:
-- cached mock for `id = 1`
-- replay request for `id = 2`
-- accidental match
-
-PostgreSQL-style placeholders such as `$1`, `$2` are also counted correctly.
-
-## Sequential mode
-
-If `SequentialMode` is enabled, each matched entry is consumed once and then skipped on the next lookup. This is useful for ordered test cases or repeated calls that should return different responses.
-
-```go
-cache, _ := sqlcache.New(sqlcache.Options{
-    MockDir:        "./test-mocks/sequential",
-    SequentialMode: true,
-})
-```
+This means a cached response for `WHERE id = 1` will **not** accidentally match a request for `WHERE id = 2`.
 
 ## Cache invalidation
 
-You can invalidate entries when the underlying data changes.
-
 ```go
-cache.InvalidateByQuery("SELECT id, name FROM users WHERE id = ?")
-cache.InvalidateByTable("users")
-cache.InvalidateByPattern("SELECT * FROM users*")
-cache.InvalidateAll()
-cache.SetTTL(3600)
+cache.InvalidateByQuery("SELECT * FROM users WHERE id = ?")  // specific query
+cache.InvalidateByTable("users")                              // all queries touching a table
+cache.InvalidateByPattern("SELECT * FROM users*")             // regex pattern
+cache.InvalidateAll()                                         // everything
+cache.SetTTL(3600)                                            // expire after 1 hour
 ```
 
-## YAML storage
+## Which package to use
 
-Mocks are stored in `<mock-dir>/mocks.yaml` as YAML documents separated by `---`.
+| Package | When to use |
+|---------|------------|
+| `wrapper` | **Start here.** Drop-in replacement for `*sql.DB` with caching. |
+| `sqlcache` | Direct cache API when you want full control. |
+| `driver` | Low-level `database/sql/driver` integration. |
 
-Stored request metadata includes:
-- original query text
-- argument values
-- query type
-- referenced tables
-- canonical structure fingerprint
-- placeholder count
-
-Stored response metadata includes:
-- columns and row values for queries
-- `LastInsertID` and `RowsAffected` for execs
-- captured error text for failed queries
-
-## Package choices
-
-Use the package that fits your integration point.
-
-- `wrapper`: easiest API, mirrors common `database/sql` usage
-- `sqlcache`: direct cache object if you want explicit control
-- `driver`: lower-level `database/sql/driver` integration
-
-For most applications, start with `wrapper`.
-
-## Examples
-
-Runnable examples are in:
-- `examples/basic`
-- `examples/testing`
-- `examples/integration`
-
-Typical commands:
+## More examples
 
 ```bash
-go run ./examples/basic
-go run ./examples/testing
-SQL_CACHE_MODE=auto go run ./examples/integration
-SQL_CACHE_MODE=offline go run ./examples/integration
+go run ./examples/basic         # cache-through, direct API, manual population, offline mode
+go run ./examples/testing       # test-oriented usage
+go run ./examples/integration   # auto vs offline mode comparison
 ```
 
-## Production notes
-
-- wrapper mode is the portable, production-ready path
-- offline mode is the correct choice for hermetic tests and strict no-DB replay
-- eBPF is not part of the required runtime path for this library
-- if you later build an agent mode, keep it separate from the core library API
-
-## Development
-
-Verification used in this repo:
+## Run tests
 
 ```bash
 go test ./...
